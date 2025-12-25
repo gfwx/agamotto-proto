@@ -19,6 +19,11 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const [customEndDate, setCustomEndDate] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100); // 100% = default, up to 1000% for minute precision
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [hoveredSession, setHoveredSession] = useState<{
+    session: Session;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const getDateRange = () => {
     const now = new Date();
@@ -223,8 +228,84 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
     }
   }, [zoomLevel, timelineWidth, dateLabelWidth]);
 
+  const handleSessionHover = (session: Session, event: React.MouseEvent) => {
+    setHoveredSession({
+      session,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  const handleSessionLeave = () => {
+    setHoveredSession(null);
+  };
+
+  const handleMouseMove = (session: Session, event: React.MouseEvent) => {
+    if (hoveredSession?.session.id === session.id) {
+      setHoveredSession({
+        session,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    }
+  };
+
   return (
-    <div className="space-y-6 pb-6">
+    <div className="space-y-6 pb-6 relative">
+      {/* Floating Session Details Dialog */}
+      {hoveredSession && (
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{
+            left: `${hoveredSession.x + 15}px`,
+            top: `${hoveredSession.y + 15}px`,
+          }}
+        >
+          <Card className="shadow-lg border-2 min-w-[280px] max-w-[400px]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">
+                {hoveredSession.session.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Start:</span>
+                <span className="font-medium">
+                  {formatTime(new Date(hoveredSession.session.timestamp))}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Duration:</span>
+                <span className="font-medium">
+                  {formatDuration(hoveredSession.session.duration)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">End:</span>
+                <span className="font-medium">
+                  {formatTime(new Date(hoveredSession.session.timestamp + hoveredSession.session.duration))}
+                </span>
+              </div>
+              {hoveredSession.session.rating > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Rating:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">{hoveredSession.session.rating}</span>
+                    <span className="text-yellow-400">★</span>
+                  </div>
+                </div>
+              )}
+              {hoveredSession.session.comment && (
+                <div className="pt-2 border-t">
+                  <span className="text-muted-foreground block mb-1">Comment:</span>
+                  <p className="text-sm">{hoveredSession.session.comment}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="px-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl">Historical Data</h2>
@@ -299,16 +380,21 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                             const leftPx = (startMinutes / 1440) * timelineWidth;
                             const widthPx = (durationMinutes / 1440) * timelineWidth;
 
+                            // Find the original session object for this item
+                            const originalSession = sessions.find(s => s.id === item.id)!;
+
                             return (
                               <div
                                 key={item.id}
-                                className="absolute h-7 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden"
+                                className="absolute h-7 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden cursor-pointer"
                                 style={{
                                   left: `${leftPx}px`,
                                   width: `${widthPx}px`,
                                   top: `${idx * 32}px`,
                                 }}
-                                title={`${item.title} - ${formatTime(item.start)} to ${formatTime(item.end)}`}
+                                onMouseEnter={(e) => handleSessionHover(originalSession, e)}
+                                onMouseMove={(e) => handleMouseMove(originalSession, e)}
+                                onMouseLeave={handleSessionLeave}
                               >
                                 <span className="text-xs text-primary-foreground truncate">
                                   {item.title}
