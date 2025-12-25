@@ -1,10 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Square, Clock } from 'lucide-react';
-import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useState, useEffect, useRef } from "react";
+import { Play, Pause, Square, Clock } from "lucide-react";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 interface StopwatchProps {
   onComplete: (duration: number) => void;
@@ -12,14 +24,22 @@ interface StopwatchProps {
   onStopgapChange: (stopgap: number) => void;
 }
 
-export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: StopwatchProps) {
+export function Stopwatch({
+  onComplete,
+  defaultStopgap,
+  onStopgapChange,
+}: StopwatchProps) {
   const [time, setTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showStopgapDialog, setShowStopgapDialog] = useState(false);
   const [sessionStopgap, setSessionStopgap] = useState(defaultStopgap);
-  const [stopgapValue, setStopgapValue] = useState(String(defaultStopgap / 60000)); // Convert ms to minutes
-  const [stopgapUnit, setStopgapUnit] = useState<'minutes' | 'hours'>('minutes');
+  const [stopgapValue, setStopgapValue] = useState(
+    String(defaultStopgap / 60000),
+  ); // Convert ms to minutes
+  const [stopgapUnit, setStopgapUnit] = useState<"minutes" | "hours">(
+    "minutes",
+  );
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if stopgap reached
@@ -60,9 +80,9 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
     const ms = Math.floor((milliseconds % 1000) / 10);
 
     if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
     }
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   };
 
   const handleStartPause = () => {
@@ -90,46 +110,50 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
 
   const handleSaveStopgap = () => {
     const value = parseFloat(stopgapValue) || 0;
-    const milliseconds = stopgapUnit === 'hours' 
-      ? value * 60 * 60 * 1000 
-      : value * 60 * 1000;
-    
+    const milliseconds =
+      stopgapUnit === "hours" ? value * 60 * 60 * 1000 : value * 60 * 1000;
+
     // Clamp to 24 hours max
     const clampedMs = Math.min(milliseconds, 24 * 60 * 60 * 1000);
-    
+
     setSessionStopgap(clampedMs);
     onStopgapChange(clampedMs);
     setShowStopgapDialog(false);
   };
 
   const getStopgapDisplay = () => {
-    if (sessionStopgap === 0) return 'No limit';
+    if (sessionStopgap === 0) return "No limit";
     const minutes = Math.floor(sessionStopgap / 60000);
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    
+
     if (hours > 0) {
-      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+      return remainingMinutes > 0
+        ? `${hours}h ${remainingMinutes}m`
+        : `${hours}h`;
     }
     return `${minutes}m`;
   };
 
   const hasStarted = time > 0 || isRunning;
-  const stopgapProgress = sessionStopgap > 0 ? (time / sessionStopgap) * 100 : 0;
+  const stopgapProgress =
+    sessionStopgap > 0 ? (time / sessionStopgap) * 100 : 0;
   const isStopgapReached = sessionStopgap > 0 && time >= sessionStopgap;
 
   return (
     <>
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
         <div className="mb-12">
-          <div className={`text-6xl font-mono tracking-tight text-center transition-colors ${isStopgapReached ? 'text-red-500' : ''}`}>
+          <div
+            className={`text-6xl font-mono tracking-tight text-center transition-colors ${isStopgapReached ? "text-red-500" : ""}`}
+          >
             {formatTime(time)}
           </div>
           {sessionStopgap > 0 && hasStarted && (
             <div className="mt-4 w-64 mx-auto">
               <div className="h-1 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className={`h-full transition-all duration-300 ${isStopgapReached ? 'bg-red-500' : 'bg-primary'}`}
+                <div
+                  className={`h-full transition-all duration-300 ${isStopgapReached ? "bg-red-500" : "bg-primary"}`}
                   style={{ width: `${Math.min(stopgapProgress, 100)}%` }}
                 />
               </div>
@@ -166,10 +190,7 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
         </div>
 
         {!hasStarted ? (
-          <div className="mt-8 text-center space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Tap to start tracking
-            </p>
+          <div className="mt-8 text-center space-y-3 flex items-center flex-col">
             <Button
               variant="ghost"
               size="sm"
@@ -179,6 +200,9 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
               <Clock className="h-4 w-4" />
               {getStopgapDisplay()}
             </Button>
+            <p className="text-sm text-muted-foreground">
+              Maximum session time
+            </p>
           </div>
         ) : (
           <Button
@@ -202,7 +226,8 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
 
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Set a time limit for this session. The stopwatch will automatically stop when reached.
+              Set a time limit for this session. The stopwatch will
+              automatically stop when reached.
             </p>
 
             <div className="space-y-2">
@@ -212,7 +237,7 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
                   id="stopgap-value"
                   type="number"
                   min="0"
-                  max={stopgapUnit === 'hours' ? '24' : '1440'}
+                  max={stopgapUnit === "hours" ? "24" : "1440"}
                   value={stopgapValue}
                   onChange={(e) => setStopgapValue(e.target.value)}
                   placeholder="0"
@@ -220,13 +245,13 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
                 />
                 <Select
                   value={stopgapUnit}
-                  onValueChange={(value: 'minutes' | 'hours') => {
+                  onValueChange={(value: "minutes" | "hours") => {
                     setStopgapUnit(value);
                     // Convert value when switching units
                     const currentValue = parseFloat(stopgapValue) || 0;
-                    if (value === 'hours' && stopgapUnit === 'minutes') {
+                    if (value === "hours" && stopgapUnit === "minutes") {
                       setStopgapValue(String(currentValue / 60));
-                    } else if (value === 'minutes' && stopgapUnit === 'hours') {
+                    } else if (value === "minutes" && stopgapUnit === "hours") {
                       setStopgapValue(String(currentValue * 60));
                     }
                   }}
@@ -250,9 +275,7 @@ export function Stopwatch({ onComplete, defaultStopgap, onStopgapChange }: Stopw
             <Button variant="ghost" onClick={() => setShowStopgapDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveStopgap}>
-              Apply
-            </Button>
+            <Button onClick={handleSaveStopgap}>Apply</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

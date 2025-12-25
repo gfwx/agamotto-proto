@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Timer, ChartBar, History } from 'lucide-react';
-import { Stopwatch } from './components/Stopwatch';
-import { SessionDialog } from './components/SessionDialog';
-import { DailySummary, Session } from './components/DailySummary';
-import { HistoricalData } from './components/HistoricalData';
-import { Button } from './components/ui/button';
+import { useState, useEffect } from "react";
+import { Timer, ChartBar, History } from "lucide-react";
+import { Stopwatch } from "./components/Stopwatch";
+import { SessionDialog } from "./components/SessionDialog";
+import { DailySummary, Session } from "./components/DailySummary";
+import { HistoricalData } from "./components/HistoricalData";
+import { Button } from "./components/ui/button";
 
-const STORAGE_KEY = 'agamotto_sessions';
-const STOPGAP_KEY = 'agamotto_stopgap';
+const STORAGE_KEY = "agamotto_sessions";
+const STOPGAP_KEY = "agamotto_stopgap";
 const DEFAULT_STOPGAP = 60 * 60 * 1000; // 1 hour in milliseconds
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentView, setCurrentView] = useState<'timer' | 'today' | 'historical'>('timer');
+  const [currentView, setCurrentView] = useState<
+    "timer" | "today" | "historical"
+  >("timer");
   const [showDialog, setShowDialog] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
   const [defaultStopgap, setDefaultStopgap] = useState(DEFAULT_STOPGAP);
@@ -24,7 +26,7 @@ function App() {
       try {
         setSessions(JSON.parse(stored));
       } catch (e) {
-        console.error('Failed to parse stored sessions', e);
+        console.error("Failed to parse stored sessions", e);
       }
     }
 
@@ -33,7 +35,7 @@ function App() {
       try {
         setDefaultStopgap(parseInt(storedStopgap, 10));
       } catch (e) {
-        console.error('Failed to parse stored stopgap', e);
+        console.error("Failed to parse stored stopgap", e);
       }
     }
   }, []);
@@ -82,7 +84,14 @@ function App() {
   const handleExportCSV = () => {
     if (sessions.length === 0) return;
 
-    const headers = ['Date', 'Time', 'Title', 'Duration (seconds)', 'Rating', 'Comment'];
+    const headers = [
+      "Date",
+      "Time",
+      "Title",
+      "Duration (seconds)",
+      "Rating",
+      "Comment",
+    ];
     const rows = sessions.map((session) => {
       const date = new Date(session.timestamp);
       return [
@@ -96,16 +105,16 @@ function App() {
     });
 
     const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-    ].join('\n');
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `agamotto_export_${Date.now()}.csv`);
-    link.style.visibility = 'hidden';
+    link.setAttribute("href", url);
+    link.setAttribute("download", `agamotto_export_${Date.now()}.csv`);
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -115,8 +124,9 @@ function App() {
     <div className="min-h-screen flex flex-col pb-32 md:pb-0">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-[1200px] mx-auto px-6 py-4">
-          <h1 className="text-2xl">Agamotto</h1>
+        <div className="max-w-[1200px] mx-auto px-6 py-4 flex justify-between items-center md:flex-row flex-col">
+          <h1 className="text-2xl">agamotto</h1>
+          <p className="opacity-60">time tracking without the bullshit</p>
         </div>
       </header>
 
@@ -124,27 +134,27 @@ function App() {
       <nav className="border-b bg-background hidden md:block">
         <div className="max-w-[1200px] mx-auto px-6 py-2 flex gap-2">
           <Button
-            variant={currentView === 'timer' ? 'default' : 'ghost'}
+            variant={currentView === "timer" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setCurrentView('timer')}
+            onClick={() => setCurrentView("timer")}
             className="gap-2"
           >
             <Timer className="h-4 w-4" />
             Timer
           </Button>
           <Button
-            variant={currentView === 'today' ? 'default' : 'ghost'}
+            variant={currentView === "today" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setCurrentView('today')}
+            onClick={() => setCurrentView("today")}
             className="gap-2"
           >
             <ChartBar className="h-4 w-4" />
             Today's Insights
           </Button>
           <Button
-            variant={currentView === 'historical' ? 'default' : 'ghost'}
+            variant={currentView === "historical" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setCurrentView('historical')}
+            onClick={() => setCurrentView("historical")}
             className="gap-2"
           >
             <History className="h-4 w-4" />
@@ -157,44 +167,52 @@ function App() {
       <nav className="fixed bottom-0 left-0 right-0 bg-background border-t md:hidden mb-[36px] z-50">
         <div className="flex justify-around items-end px-4 py-3">
           <Button
-            variant={currentView === 'timer' ? 'default' : 'ghost'}
+            variant={currentView === "timer" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setCurrentView('timer')}
+            onClick={() => setCurrentView("timer")}
             className="flex-col h-auto py-2 px-3 gap-1"
           >
             <Timer className="h-9 w-9" />
             <span className="text-xs">Timer</span>
           </Button>
           <Button
-            variant={currentView === 'today' ? 'default' : 'ghost'}
+            variant={currentView === "today" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setCurrentView('today')}
+            onClick={() => setCurrentView("today")}
             className="flex-col h-auto py-2 px-3 gap-1"
           >
             <ChartBar className="h-9 w-9" />
-            <span className="text-xs">Today's<br/>Insights</span>
+            <span className="text-xs">
+              Today's
+              <br />
+              Insights
+            </span>
           </Button>
           <Button
-            variant={currentView === 'historical' ? 'default' : 'ghost'}
+            variant={currentView === "historical" ? "default" : "ghost"}
             size="sm"
-            onClick={() => setCurrentView('historical')}
+            onClick={() => setCurrentView("historical")}
             className="flex-col h-auto py-2 px-3 gap-1"
           >
             <History className="h-9 w-9" />
-            <span className="text-xs">Historical<br/>Data</span>
+            <span className="text-xs">
+              Historical
+              <br />
+              Data
+            </span>
           </Button>
         </div>
       </nav>
 
       {/* Main Content */}
       <main className="max-w-[1200px] mx-auto w-full">
-        {currentView === 'timer' ? (
-          <Stopwatch 
-            onComplete={handleStopwatchComplete} 
+        {currentView === "timer" ? (
+          <Stopwatch
+            onComplete={handleStopwatchComplete}
             defaultStopgap={defaultStopgap}
             onStopgapChange={handleStopgapChange}
           />
-        ) : currentView === 'today' ? (
+        ) : currentView === "today" ? (
           <div className="py-6">
             <DailySummary sessions={sessions} />
           </div>
