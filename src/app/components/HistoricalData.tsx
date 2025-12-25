@@ -164,10 +164,6 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
     return `${hours}:${minutes}`;
   };
 
-  const getHourFromDate = (date: Date) => {
-    return date.getHours() + date.getMinutes() / 60;
-  };
-
   // Calculate time scale based on zoom level
   const getTimeScale = () => {
     if (zoomLevel >= 800) {

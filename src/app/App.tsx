@@ -125,7 +125,7 @@ function App() {
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-[1200px] mx-auto px-6 py-4 flex justify-between items-center md:flex-row flex-col">
-          <h1 className="text-2xl">agamotto</h1>
+          <h1 className="font-bold text-2xl">agamotto</h1>
           <p className="opacity-60">time tracking without the bullshit</p>
         </div>
       </header>
