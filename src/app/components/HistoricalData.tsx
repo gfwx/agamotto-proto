@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Download, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -18,6 +18,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [zoomLevel, setZoomLevel] = useState(100); // 100% = default, up to 1000% for minute precision
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const getDateRange = () => {
     const now = new Date();
@@ -207,6 +208,21 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const dateLabelWidth = 128; // w-32 = 8rem = 128px
   const totalWidth = timelineWidth + dateLabelWidth;
 
+  // Auto-center on current time when zooming
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentTimePosition = (currentMinutes / 1440) * timelineWidth;
+
+      // Center the scroll on the current time position
+      const containerWidth = scrollContainerRef.current.clientWidth;
+      const scrollLeft = currentTimePosition + dateLabelWidth - (containerWidth / 2);
+
+      scrollContainerRef.current.scrollLeft = Math.max(0, scrollLeft);
+    }
+  }, [zoomLevel, timelineWidth, dateLabelWidth]);
+
   return (
     <div className="space-y-6 pb-6">
       <div className="px-6 space-y-4">
@@ -244,7 +260,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="relative min-h-[200px] overflow-x-auto overflow-y-hidden">
+              <div ref={scrollContainerRef} className="relative min-h-[200px] overflow-x-auto overflow-y-hidden">
                 <div className="relative" style={{ width: `${totalWidth}px` }}>
                   {/* Time grid */}
                   <div className="flex border-b border-gray-200 pb-2 mb-4 sticky top-0 bg-background z-10">
