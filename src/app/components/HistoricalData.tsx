@@ -17,6 +17,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('hourly');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [zoomLevel, setZoomLevel] = useState(100); // 100% = default, up to 1000% for minute precision
 
   const getDateRange = () => {
     const now = new Date();
@@ -152,24 +153,59 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   };
 
   const getHourFromDate = (date: Date) => {
     return date.getHours() + date.getMinutes() / 60;
   };
 
-  const formatHour = (hour: number) => {
-    const h = Math.floor(hour);
-    const m = Math.round((hour - h) * 60);
-    const period = h >= 12 ? 'PM' : 'AM';
-    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return m > 0 ? `${displayHour}:${m.toString().padStart(2, '0')}${period}` : `${displayHour}${period}`;
+  // Calculate time scale based on zoom level
+  const getTimeScale = () => {
+    if (zoomLevel >= 800) {
+      // 800-1000%: Show every minute
+      return { unit: 'minute', count: 1440, label: (i: number) => {
+        const h = Math.floor(i / 60);
+        const m = i % 60;
+        if (m % 15 === 0) { // Show label every 15 minutes
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        }
+        return '';
+      }};
+    } else if (zoomLevel >= 400) {
+      // 400-799%: Show every 5 minutes
+      return { unit: '5min', count: 288, label: (i: number) => {
+        const totalMinutes = i * 5;
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        if (m % 30 === 0) { // Show label every 30 minutes
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        }
+        return '';
+      }};
+    } else if (zoomLevel >= 200) {
+      // 200-399%: Show every 15 minutes
+      return { unit: '15min', count: 96, label: (i: number) => {
+        const totalMinutes = i * 15;
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+      }};
+    } else {
+      // 100-199%: Show every hour
+      return { unit: 'hour', count: 24, label: (i: number) => {
+        return `${i.toString().padStart(2, '0')}:00`;
+      }};
+    }
   };
+
+  const timeScale = getTimeScale();
+  const baseTimelineWidth = 1200; // Base width for timeline area at 100%
+  const timelineWidth = (baseTimelineWidth * zoomLevel) / 100;
+  const dateLabelWidth = 128; // w-32 = 8rem = 128px
+  const totalWidth = timelineWidth + dateLabelWidth;
 
   return (
     <div className="space-y-6 pb-6">
@@ -192,20 +228,42 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       {ganttData.length > 0 ? (
         <div className="px-6 space-y-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-sm">Timeline View</CardTitle>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">Zoom: {zoomLevel}%</span>
+                <input
+                  type="range"
+                  min="100"
+                  max="1000"
+                  step="50"
+                  value={zoomLevel}
+                  onChange={(e) => setZoomLevel(Number(e.target.value))}
+                  className="w-32"
+                />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="relative min-h-[200px] overflow-x-auto">
-                <div className="relative" style={{ minWidth: '800px' }}>
+              <div className="relative min-h-[200px] overflow-x-auto overflow-y-hidden">
+                <div className="relative" style={{ width: `${totalWidth}px` }}>
                   {/* Time grid */}
-                  <div className="flex border-b border-gray-200 pb-2 mb-4">
-                    <div className="w-32 flex-shrink-0"></div>
-                    {Array.from({ length: 25 }, (_, i) => (
-                      <div key={i} className="flex-1 text-xs text-center text-muted-foreground">
-                        {i}
-                      </div>
-                    ))}
+                  <div className="flex border-b border-gray-200 pb-2 mb-4 sticky top-0 bg-background z-10">
+                    <div className="flex-shrink-0" style={{ width: `${dateLabelWidth}px` }}></div>
+                    <div className="flex" style={{ width: `${timelineWidth}px` }}>
+                      {Array.from({ length: timeScale.count }, (_, i) => {
+                        const label = timeScale.label(i);
+                        const cellWidth = timelineWidth / timeScale.count;
+                        return (
+                          <div
+                            key={i}
+                            className="text-xs text-center text-muted-foreground border-l border-gray-100 first:border-l-0"
+                            style={{ width: `${cellWidth}px` }}
+                          >
+                            {label}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {/* Session bars grouped by day */}
@@ -213,32 +271,32 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                     {ganttData.map((dayData) => (
                       <div key={dayData.dateKey} className="flex">
                         {/* Date label */}
-                        <div className="w-32 flex-shrink-0 text-xs font-medium text-muted-foreground flex items-start pt-1">
+                        <div className="flex-shrink-0 text-xs font-medium text-muted-foreground flex items-start pt-1 sticky left-0 bg-background" style={{ width: `${dateLabelWidth}px` }}>
                           {dayData.dateKey}
                         </div>
 
                         {/* Timeline for this day */}
-                        <div className="flex-1 space-y-1">
-                          {dayData.sessions.map((item) => {
-                            const startHour = getHourFromDate(item.start);
-                            const durationHours = item.duration / (1000 * 60 * 60);
-                            const leftPercent = (startHour / 24) * 100;
-                            const widthPercent = (durationHours / 24) * 100;
+                        <div className="relative" style={{ width: `${timelineWidth}px`, height: `${dayData.sessions.length * 32}px`, minHeight: '32px' }}>
+                          {dayData.sessions.map((item, idx) => {
+                            const startMinutes = item.start.getHours() * 60 + item.start.getMinutes();
+                            const durationMinutes = item.duration / (1000 * 60);
+                            const leftPx = (startMinutes / 1440) * timelineWidth;
+                            const widthPx = (durationMinutes / 1440) * timelineWidth;
 
                             return (
-                              <div key={item.id} className="relative h-8">
-                                <div
-                                  className="absolute h-7 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden"
-                                  style={{
-                                    left: `${leftPercent}%`,
-                                    width: `${widthPercent}%`,
-                                  }}
-                                  title={`${item.title} - ${formatTime(item.start)} to ${formatTime(item.end)}`}
-                                >
-                                  <span className="text-xs text-primary-foreground truncate">
-                                    {item.title}
-                                  </span>
-                                </div>
+                              <div
+                                key={item.id}
+                                className="absolute h-7 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden"
+                                style={{
+                                  left: `${leftPx}px`,
+                                  width: `${widthPx}px`,
+                                  top: `${idx * 32}px`,
+                                }}
+                                title={`${item.title} - ${formatTime(item.start)} to ${formatTime(item.end)}`}
+                              >
+                                <span className="text-xs text-primary-foreground truncate">
+                                  {item.title}
+                                </span>
                               </div>
                             );
                           })}
