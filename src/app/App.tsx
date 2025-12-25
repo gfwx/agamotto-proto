@@ -115,14 +115,14 @@ function App() {
     <div className="min-h-screen flex flex-col pb-32 md:pb-0">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-2xl mx-auto px-6 py-4">
+        <div className="max-w-[1200px] mx-auto px-6 py-4">
           <h1 className="text-2xl">Agamotto</h1>
         </div>
       </header>
 
       {/* Navigation - Desktop */}
       <nav className="border-b bg-background hidden md:block">
-        <div className="max-w-2xl mx-auto px-6 py-2 flex gap-2">
+        <div className="max-w-[1200px] mx-auto px-6 py-2 flex gap-2">
           <Button
             variant={currentView === 'timer' ? 'default' : 'ghost'}
             size="sm"
@@ -187,7 +187,7 @@ function App() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto">
+      <main className="max-w-[1200px] mx-auto w-full">
         {currentView === 'timer' ? (
           <Stopwatch 
             onComplete={handleStopwatchComplete} 

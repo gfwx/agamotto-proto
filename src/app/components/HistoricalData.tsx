@@ -60,20 +60,41 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   }, [sessions, start, end]);
 
   const ganttData = useMemo(() => {
-    return timelineFilteredSessions.map((session) => {
-      const sessionStart = new Date(session.timestamp);
-      const sessionEnd = new Date(session.timestamp + session.duration);
-      
-      return {
-        id: session.id,
-        title: session.title,
-        start: sessionStart,
-        end: sessionEnd,
-        duration: session.duration,
-        rating: session.rating,
-        y: sessionStart.getDate() + sessionStart.getMonth() * 31,
-      };
+    // Group sessions by day
+    const grouped = new Map<string, typeof timelineFilteredSessions>();
+
+    timelineFilteredSessions.forEach((session) => {
+      const date = new Date(session.timestamp);
+      const dateKey = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, []);
+      }
+      grouped.get(dateKey)!.push(session);
     });
+
+    // Convert to array and sort by date (most recent first)
+    return Array.from(grouped.entries())
+      .sort((a, b) => {
+        const dateA = new Date(a[1][0].timestamp);
+        const dateB = new Date(b[1][0].timestamp);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .map(([dateKey, sessions]) => ({
+        dateKey,
+        sessions: sessions.map((session) => ({
+          id: session.id,
+          title: session.title,
+          start: new Date(session.timestamp),
+          end: new Date(session.timestamp + session.duration),
+          duration: session.duration,
+          rating: session.rating,
+        })),
+      }));
   }, [timelineFilteredSessions]);
 
   // Daily tables show ALL sessions, not filtered by view period
@@ -156,16 +177,17 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
 
       {/* Gantt Chart */}
       {ganttData.length > 0 ? (
-        <div className="px-6 space-y-4">
+        <div className="px-6 space-y-2">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Timeline View</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="relative min-h-[200px] overflow-x-auto">
-                <div className="relative" style={{ minWidth: '600px' }}>
+                <div className="relative" style={{ minWidth: '800px' }}>
                   {/* Time grid */}
                   <div className="flex border-b border-gray-200 pb-2 mb-4">
+                    <div className="w-32 flex-shrink-0"></div>
                     {Array.from({ length: 25 }, (_, i) => (
                       <div key={i} className="flex-1 text-xs text-center text-muted-foreground">
                         {i}
@@ -173,34 +195,43 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                     ))}
                   </div>
 
-                  {/* Session bars */}
-                  <div className="space-y-2">
-                    {ganttData.map((item) => {
-                      const startHour = getHourFromDate(item.start);
-                      const durationHours = item.duration / (1000 * 60 * 60);
-                      const leftPercent = (startHour / 24) * 100;
-                      const widthPercent = (durationHours / 24) * 100;
-
-                      return (
-                        <div key={item.id} className="relative h-10">
-                          <div
-                            className="absolute h-8 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden"
-                            style={{
-                              left: `${leftPercent}%`,
-                              width: `${widthPercent}%`,
-                            }}
-                            title={`${item.title} - ${formatTime(item.start)} to ${formatTime(item.end)}`}
-                          >
-                            <span className="text-xs text-primary-foreground truncate">
-                              {item.title}
-                            </span>
-                          </div>
-                          <div className="absolute left-0 top-0 h-8 flex items-center text-xs text-muted-foreground">
-                            {formatTime(item.start)}
-                          </div>
+                  {/* Session bars grouped by day */}
+                  <div className="space-y-4">
+                    {ganttData.map((dayData) => (
+                      <div key={dayData.dateKey} className="flex">
+                        {/* Date label */}
+                        <div className="w-32 flex-shrink-0 text-xs font-medium text-muted-foreground flex items-start pt-1">
+                          {dayData.dateKey}
                         </div>
-                      );
-                    })}
+
+                        {/* Timeline for this day */}
+                        <div className="flex-1 space-y-1">
+                          {dayData.sessions.map((item) => {
+                            const startHour = getHourFromDate(item.start);
+                            const durationHours = item.duration / (1000 * 60 * 60);
+                            const leftPercent = (startHour / 24) * 100;
+                            const widthPercent = (durationHours / 24) * 100;
+
+                            return (
+                              <div key={item.id} className="relative h-8">
+                                <div
+                                  className="absolute h-7 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden"
+                                  style={{
+                                    left: `${leftPercent}%`,
+                                    width: `${widthPercent}%`,
+                                  }}
+                                  title={`${item.title} - ${formatTime(item.start)} to ${formatTime(item.end)}`}
+                                >
+                                  <span className="text-xs text-primary-foreground truncate">
+                                    {item.title}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -208,59 +239,55 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
           </Card>
 
           {/* View Period Controls */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Timeline Period</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={viewMode === 'hourly' ? 'default' : 'outline'}
-                  onClick={() => setViewMode('hourly')}
-                >
-                  Hourly
-                </Button>
-                <Button
-                  size="sm"
-                  variant={viewMode === 'weekly' ? 'default' : 'outline'}
-                  onClick={() => setViewMode('weekly')}
-                >
-                  Weekly
-                </Button>
-                <Button
-                  size="sm"
-                  variant={viewMode === 'custom' ? 'default' : 'outline'}
-                  onClick={() => setViewMode('custom')}
-                >
-                  Custom
-                </Button>
-              </div>
+          <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+            <div className="text-sm font-medium">Timeline Period</div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant={viewMode === 'hourly' ? 'default' : 'outline'}
+                onClick={() => setViewMode('hourly')}
+              >
+                Hourly
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'weekly' ? 'default' : 'outline'}
+                onClick={() => setViewMode('weekly')}
+              >
+                Weekly
+              </Button>
+              <Button
+                size="sm"
+                variant={viewMode === 'custom' ? 'default' : 'outline'}
+                onClick={() => setViewMode('custom')}
+              >
+                Custom
+              </Button>
+            </div>
 
-              {viewMode === 'custom' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-date" className="text-xs">Start Date</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-date" className="text-xs">End Date</Label>
-                    <Input
-                      id="end-date"
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                    />
-                  </div>
+            {viewMode === 'custom' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="start-date" className="text-xs">Start Date</Label>
+                  <Input
+                    id="start-date"
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="end-date" className="text-xs">End Date</Label>
+                  <Input
+                    id="end-date"
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="px-6">
