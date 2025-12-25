@@ -21,31 +21,44 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const getDateRange = () => {
     const now = new Date();
     let start: Date;
-    let end: Date = now;
+    let end: Date;
 
     switch (viewMode) {
       case 'hourly':
+        // Show only today's sessions
         start = new Date(now);
-        start.setMinutes(0, 0, 0);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(now);
+        end.setHours(23, 59, 59, 999);
         break;
       case 'weekly':
+        // Show last 7 days
         start = new Date(now);
         start.setDate(start.getDate() - 7);
         start.setHours(0, 0, 0, 0);
+        end = new Date(now);
+        end.setHours(23, 59, 59, 999);
         break;
       case 'custom':
+        // Show custom date range
         if (customStartDate && customEndDate) {
           start = new Date(customStartDate);
+          start.setHours(0, 0, 0, 0);
           end = new Date(customEndDate);
           end.setHours(23, 59, 59, 999);
         } else {
+          // Default to today if dates not set
           start = new Date(now);
           start.setHours(0, 0, 0, 0);
+          end = new Date(now);
+          end.setHours(23, 59, 59, 999);
         }
         break;
       default:
         start = new Date(now);
         start.setHours(0, 0, 0, 0);
+        end = new Date(now);
+        end.setHours(23, 59, 59, 999);
     }
 
     return { start, end };
