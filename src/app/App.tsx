@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Timer, ChartBar, History } from "lucide-react";
 import { Stopwatch } from "./components/Stopwatch";
 import { SessionDialog } from "./components/SessionDialog";
@@ -18,6 +18,31 @@ function App() {
   const [showDialog, setShowDialog] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
   const [defaultStopgap, setDefaultStopgap] = useState(DEFAULT_STOPGAP);
+
+  // Lifted timer state to persist across view changes
+  const [time, setTime] = useState(0);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Timer interval effect - runs regardless of which view is active
+  useEffect(() => {
+    if (isRunning) {
+      intervalRef.current = setInterval(() => {
+        setTime((prevTime) => prevTime + 10);
+      }, 10);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isRunning]);
 
   // Load sessions and stopgap from localStorage on mount
   useEffect(() => {
@@ -211,6 +236,12 @@ function App() {
             onComplete={handleStopwatchComplete}
             defaultStopgap={defaultStopgap}
             onStopgapChange={handleStopgapChange}
+            time={time}
+            setTime={setTime}
+            isRunning={isRunning}
+            setIsRunning={setIsRunning}
+            isPaused={isPaused}
+            setIsPaused={setIsPaused}
           />
         ) : currentView === "today" ? (
           <div className="py-6">

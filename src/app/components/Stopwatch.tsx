@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Play, Pause, Square, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -22,16 +22,25 @@ interface StopwatchProps {
   onComplete: (duration: number) => void;
   defaultStopgap: number;
   onStopgapChange: (stopgap: number) => void;
+  time: number;
+  setTime: (time: number | ((prev: number) => number)) => void;
+  isRunning: boolean;
+  setIsRunning: (isRunning: boolean) => void;
+  isPaused: boolean;
+  setIsPaused: (isPaused: boolean) => void;
 }
 
 export function Stopwatch({
   onComplete,
   defaultStopgap,
   onStopgapChange,
+  time,
+  setTime,
+  isRunning,
+  setIsRunning,
+  isPaused,
+  setIsPaused,
 }: StopwatchProps) {
-  const [time, setTime] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [showStopgapDialog, setShowStopgapDialog] = useState(false);
   const [sessionStopgap, setSessionStopgap] = useState(defaultStopgap);
   const [stopgapValue, setStopgapValue] = useState(
@@ -40,7 +49,6 @@ export function Stopwatch({
   const [stopgapUnit, setStopgapUnit] = useState<"minutes" | "hours">(
     "minutes",
   );
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if stopgap reached
   useEffect(() => {
@@ -52,25 +60,7 @@ export function Stopwatch({
       setSessionStopgap(defaultStopgap);
       onComplete(duration);
     }
-  }, [time, sessionStopgap, isRunning, onComplete, defaultStopgap]);
-
-  useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        setTime((prevTime) => prevTime + 10);
-      }, 10);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isRunning]);
+  }, [time, sessionStopgap, isRunning, onComplete, defaultStopgap, setIsRunning, setTime, setIsPaused]);
 
   const formatTime = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
