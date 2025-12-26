@@ -1,32 +1,36 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
-import { Label } from './ui/label';
-import { Star } from 'lucide-react';
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
+import { Star } from "lucide-react";
 
 interface SessionDialogProps {
   open: boolean;
   duration: number;
-  onSave: (data: {
-    title: string;
-    rating: number;
-    comment: string;
-  }) => void;
+  onSave: (data: { title: string; rating: number; comment: string }) => void;
   onCancel: () => void;
+  onDiscard: () => void;
 }
 
-export function SessionDialog({ open, duration, onSave, onCancel }: SessionDialogProps) {
-  const [title, setTitle] = useState('');
+export function SessionDialog({
+  open,
+  duration,
+  onSave,
+  onCancel,
+  onDiscard,
+}: SessionDialogProps) {
+  const [title, setTitle] = useState("");
   const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const formatDuration = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -46,22 +50,41 @@ export function SessionDialog({ open, duration, onSave, onCancel }: SessionDialo
   const handleSave = () => {
     onSave({ title, rating, comment });
     // Reset form
-    setTitle('');
+    setTitle("");
     setRating(0);
-    setComment('');
+    setComment("");
+    setShowDiscardConfirm(false);
   };
 
   const handleSkip = () => {
     onCancel();
     // Reset form
-    setTitle('');
+    setTitle("");
     setRating(0);
-    setComment('');
+    setComment("");
+    setShowDiscardConfirm(false);
+  };
+
+  const handleDiscard = () => {
+    if (!showDiscardConfirm) {
+      setShowDiscardConfirm(true);
+    } else {
+      onDiscard();
+      // Reset form
+      setTitle("");
+      setRating(0);
+      setComment("");
+      setShowDiscardConfirm(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleSkip()}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} modal>
+      <DialogContent
+        className="max-w-md [&>button:first-of-type]:hidden"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Session Complete</DialogTitle>
         </DialogHeader>
@@ -96,8 +119,8 @@ export function SessionDialog({ open, duration, onSave, onCancel }: SessionDialo
                   <Star
                     className={`h-8 w-8 ${
                       value <= rating
-                        ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300'
+                        ? "fill-yellow-400 text-yellow-400"
+                        : "text-gray-300"
                     }`}
                   />
                 </button>
@@ -117,13 +140,22 @@ export function SessionDialog({ open, duration, onSave, onCancel }: SessionDialo
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="ghost" onClick={handleSkip}>
-            Skip
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button
+            variant="destructive"
+            onClick={handleDiscard}
+            className="sm:mr-auto"
+          >
+            {showDiscardConfirm ? "Confirm Discard" : "Discard"}
           </Button>
-          <Button onClick={handleSave} disabled={!title.trim()}>
-            Save Session
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={handleSkip}>
+              Skip
+            </Button>
+            <Button onClick={handleSave} disabled={!title.trim()}>
+              Save Session
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

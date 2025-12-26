@@ -101,6 +101,11 @@ function App() {
     setPendingDuration(0);
   };
 
+  const handleDiscardSession = () => {
+    setShowDialog(false);
+    setPendingDuration(0);
+  };
+
   const handleStopgapChange = (stopgap: number) => {
     setDefaultStopgap(stopgap);
     localStorage.setItem(STOPGAP_KEY, String(stopgap));
@@ -260,6 +265,7 @@ function App() {
         duration={pendingDuration}
         onSave={handleSaveSession}
         onCancel={handleCancelSession}
+        onDiscard={handleDiscardSession}
       />
     </div>
   );
