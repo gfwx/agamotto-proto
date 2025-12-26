@@ -10,6 +10,7 @@ import { Toaster } from "./components/ui/sonner";
 
 const STORAGE_KEY = "agamotto_sessions";
 const STOPGAP_KEY = "agamotto_stopgap";
+const TIMER_STATE_KEY = "agamotto_timer_state";
 const DEFAULT_STOPGAP = 60 * 60 * 1000; // 1 hour in milliseconds
 
 function App() {
@@ -27,11 +28,24 @@ function App() {
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timer interval effect - runs regardless of which view is active
+  // Timestamp-based timing for accurate background tracking
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [accumulatedTime, setAccumulatedTime] = useState(0);
+
+  // Timer interval effect - timestamp-based for accurate background tracking
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && !isPaused) {
+      // Set start time if not already set
+      if (!startTime) {
+        setStartTime(Date.now());
+      }
+
+      // Update time display based on elapsed time since start
       intervalRef.current = setInterval(() => {
-        setTime((prevTime) => prevTime + 10);
+        if (startTime) {
+          const elapsed = Date.now() - startTime + accumulatedTime;
+          setTime(elapsed);
+        }
       }, 10);
     } else {
       if (intervalRef.current) {
@@ -44,9 +58,9 @@ function App() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning]);
+  }, [isRunning, isPaused, startTime, accumulatedTime]);
 
-  // Load sessions and stopgap from localStorage on mount
+  // Load sessions, stopgap, and timer state from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -65,6 +79,29 @@ function App() {
         console.error("Failed to parse stored stopgap", e);
       }
     }
+
+    // Restore timer state if it exists
+    const storedTimerState = localStorage.getItem(TIMER_STATE_KEY);
+    if (storedTimerState) {
+      try {
+        const state = JSON.parse(storedTimerState);
+        if (state.isRunning || state.isPaused) {
+          // Calculate time elapsed including background time
+          const elapsed = state.accumulatedTime || 0;
+          setAccumulatedTime(elapsed);
+          setTime(elapsed);
+          setIsPaused(state.isPaused);
+          setIsRunning(state.isRunning);
+
+          // If timer was running (not paused), set new start time to now
+          if (state.isRunning && !state.isPaused) {
+            setStartTime(Date.now());
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore timer state", e);
+      }
+    }
   }, []);
 
   // Save sessions to localStorage whenever they change
@@ -73,6 +110,69 @@ function App() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
     }
   }, [sessions]);
+
+  // Handle pause/resume logic - update accumulated time when pausing
+  useEffect(() => {
+    if (isPaused && startTime) {
+      // When pausing, calculate and save accumulated time
+      const elapsed = Date.now() - startTime + accumulatedTime;
+      setAccumulatedTime(elapsed);
+      setTime(elapsed);
+      setStartTime(null);
+    } else if (isRunning && !isPaused && !startTime) {
+      // When resuming from pause, set new start time
+      setStartTime(Date.now());
+    }
+  }, [isRunning, isPaused]);
+
+  // Page Visibility API - handle app backgrounding/foregrounding
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // App went to background - save current state with elapsed time
+        if (isRunning && !isPaused && startTime) {
+          const elapsed = Date.now() - startTime + accumulatedTime;
+          setAccumulatedTime(elapsed);
+          setTime(elapsed);
+        }
+      } else {
+        // App came to foreground - resume with new start time
+        if (isRunning && !isPaused) {
+          setStartTime(Date.now());
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isRunning, isPaused, startTime, accumulatedTime]);
+
+  // Persist timer state to localStorage
+  useEffect(() => {
+    if (isRunning || isPaused) {
+      // Calculate current accumulated time if running
+      const currentAccumulated =
+        isRunning && !isPaused && startTime
+          ? Date.now() - startTime + accumulatedTime
+          : accumulatedTime;
+
+      const timerState = {
+        isRunning,
+        isPaused,
+        accumulatedTime: currentAccumulated,
+      };
+
+      localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(timerState));
+    } else {
+      // Clear timer state when stopped
+      localStorage.removeItem(TIMER_STATE_KEY);
+      setStartTime(null);
+      setAccumulatedTime(0);
+    }
+  }, [isRunning, isPaused, startTime, accumulatedTime, time]);
 
   const handleStopwatchComplete = (duration: number) => {
     setPendingDuration(duration);
