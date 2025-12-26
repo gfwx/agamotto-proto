@@ -200,22 +200,24 @@ function App() {
         </nav>
 
         {/* Navigation - Mobile (Bottom) */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-background border-t md:hidden mb-[36px] z-50">
-          <div className="flex justify-around items-end px-4 py-3">
+        <nav className="fixed bottom-0 left-0 right-0 bg-background border-t md:hidden p-5 z-50">
+          <div className="flex justify-around items-center ">
             <Button
               variant={currentView === "timer" ? "default" : "ghost"}
               size="sm"
               onClick={() => setCurrentView("timer")}
-              className="flex-col h-auto py-2 px-3 gap-1"
+              className="flex-col py-2 pr-2 gap-1 w-18 h-18"
             >
               <Timer className="h-9 w-9" />
-              <span className="text-xs">Timer</span>
+              <span className="text-xs">
+                Timer <br />{" "}
+              </span>
             </Button>
             <Button
               variant={currentView === "today" ? "default" : "ghost"}
               size="sm"
               onClick={() => setCurrentView("today")}
-              className="flex-col h-auto py-2 px-3 gap-1"
+              className="flex-col py-2 px-2 gap-1 w-18 h-18"
             >
               <ChartBar className="h-9 w-9" />
               <span className="text-xs">
@@ -228,7 +230,7 @@ function App() {
               variant={currentView === "historical" ? "default" : "ghost"}
               size="sm"
               onClick={() => setCurrentView("historical")}
-              className="flex-col h-auto py-2 px-3 gap-1"
+              className="flex-col pl-2 px-2 gap-1 w-18 h-18"
             >
               <History className="h-9 w-9" />
               <span className="text-xs">
