@@ -53,8 +53,10 @@ export function Stopwatch({
   // Check if stopgap reached
   useEffect(() => {
     if (isRunning && sessionStopgap > 0 && time >= sessionStopgap) {
+      // Cap the timer at the limit and terminate the session
+      setTime(sessionStopgap);
       setIsRunning(false);
-      const duration = time;
+      const duration = sessionStopgap;
       setTime(0);
       setIsPaused(false);
       setSessionStopgap(defaultStopgap);
@@ -86,6 +88,7 @@ export function Stopwatch({
     } else {
       // Resume
       setIsRunning(true);
+      setIsPaused(false);
     }
   };
 

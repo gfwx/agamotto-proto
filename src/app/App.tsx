@@ -28,22 +28,25 @@ function App() {
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timestamp-based timing for accurate background tracking
-  const [startTime, setStartTime] = useState<number | null>(null);
-  const [accumulatedTime, setAccumulatedTime] = useState(0);
+  // New timestamp-based timing approach
+  const [initialTimestamp, setInitialTimestamp] = useState<number | null>(null);
+  const [lastPausedTimestamp, setLastPausedTimestamp] = useState<number | null>(null);
+  const [pauseTime, setPauseTime] = useState(0);
 
   // Timer interval effect - timestamp-based for accurate background tracking
   useEffect(() => {
     if (isRunning && !isPaused) {
-      // Set start time if not already set
-      if (!startTime) {
-        setStartTime(Date.now());
+      // Set initial timestamp if not already set
+      if (!initialTimestamp) {
+        const now = Date.now();
+        setInitialTimestamp(now);
+        setLastPausedTimestamp(now);
       }
 
-      // Update time display based on elapsed time since start
+      // Update time display based on elapsed time since start minus pause time
       intervalRef.current = setInterval(() => {
-        if (startTime) {
-          const elapsed = Date.now() - startTime + accumulatedTime;
+        if (initialTimestamp) {
+          const elapsed = Date.now() - (initialTimestamp + pauseTime);
           setTime(elapsed);
         }
       }, 10);
@@ -58,7 +61,7 @@ function App() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, isPaused, startTime, accumulatedTime]);
+  }, [isRunning, isPaused, initialTimestamp, pauseTime]);
 
   // Load sessions, stopgap, and timer state from localStorage on mount
   useEffect(() => {
@@ -86,16 +89,17 @@ function App() {
       try {
         const state = JSON.parse(storedTimerState);
         if (state.isRunning || state.isPaused) {
-          // Calculate time elapsed including background time
-          const elapsed = state.accumulatedTime || 0;
-          setAccumulatedTime(elapsed);
-          setTime(elapsed);
+          // Restore timestamps and pause time
+          setInitialTimestamp(state.initialTimestamp || null);
+          setLastPausedTimestamp(state.lastPausedTimestamp || null);
+          setPauseTime(state.pauseTime || 0);
           setIsPaused(state.isPaused);
           setIsRunning(state.isRunning);
 
-          // If timer was running (not paused), set new start time to now
-          if (state.isRunning && !state.isPaused) {
-            setStartTime(Date.now());
+          // Calculate and set current time
+          if (state.initialTimestamp) {
+            const elapsed = Date.now() - (state.initialTimestamp + (state.pauseTime || 0));
+            setTime(elapsed);
           }
         }
       } catch (e) {
@@ -111,17 +115,16 @@ function App() {
     }
   }, [sessions]);
 
-  // Handle pause/resume logic - update accumulated time when pausing
+  // Handle pause/resume logic - track pause time
   useEffect(() => {
-    if (isPaused && startTime) {
-      // When pausing, calculate and save accumulated time
-      const elapsed = Date.now() - startTime + accumulatedTime;
-      setAccumulatedTime(elapsed);
-      setTime(elapsed);
-      setStartTime(null);
-    } else if (isRunning && !isPaused && !startTime) {
-      // When resuming from pause, set new start time
-      setStartTime(Date.now());
+    if (isPaused && lastPausedTimestamp === null && initialTimestamp) {
+      // When pausing, record the timestamp only once
+      setLastPausedTimestamp(Date.now());
+    } else if (isRunning && !isPaused && lastPausedTimestamp !== null && initialTimestamp) {
+      // When resuming from pause, add to pause_time
+      const pauseDuration = Date.now() - lastPausedTimestamp;
+      setPauseTime(prev => prev + pauseDuration);
+      setLastPausedTimestamp(null);
     }
   }, [isRunning, isPaused]);
 
@@ -129,16 +132,16 @@ function App() {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // App went to background - save current state with elapsed time
-        if (isRunning && !isPaused && startTime) {
-          const elapsed = Date.now() - startTime + accumulatedTime;
-          setAccumulatedTime(elapsed);
+        // App went to background - update time display
+        if (isRunning && !isPaused && initialTimestamp) {
+          const elapsed = Date.now() - (initialTimestamp + pauseTime);
           setTime(elapsed);
         }
       } else {
-        // App came to foreground - resume with new start time
-        if (isRunning && !isPaused) {
-          setStartTime(Date.now());
+        // App came to foreground - timer will continue automatically
+        if (isRunning && !isPaused && initialTimestamp) {
+          const elapsed = Date.now() - (initialTimestamp + pauseTime);
+          setTime(elapsed);
         }
       }
     };
@@ -148,31 +151,28 @@ function App() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isRunning, isPaused, startTime, accumulatedTime]);
+  }, [isRunning, isPaused, initialTimestamp, pauseTime]);
 
   // Persist timer state to localStorage
   useEffect(() => {
     if (isRunning || isPaused) {
-      // Calculate current accumulated time if running
-      const currentAccumulated =
-        isRunning && !isPaused && startTime
-          ? Date.now() - startTime + accumulatedTime
-          : accumulatedTime;
-
       const timerState = {
         isRunning,
         isPaused,
-        accumulatedTime: currentAccumulated,
+        initialTimestamp,
+        lastPausedTimestamp,
+        pauseTime,
       };
 
       localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(timerState));
     } else {
       // Clear timer state when stopped
       localStorage.removeItem(TIMER_STATE_KEY);
-      setStartTime(null);
-      setAccumulatedTime(0);
+      setInitialTimestamp(null);
+      setLastPausedTimestamp(null);
+      setPauseTime(0);
     }
-  }, [isRunning, isPaused, startTime, accumulatedTime, time]);
+  }, [isRunning, isPaused, initialTimestamp, lastPausedTimestamp, pauseTime, time]);
 
   const handleStopwatchComplete = (duration: number) => {
     setPendingDuration(duration);
