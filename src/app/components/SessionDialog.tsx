@@ -148,14 +148,13 @@ export function SessionDialog({
           >
             {showDiscardConfirm ? "Confirm Discard" : "Discard"}
           </Button>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={handleSkip}>
-              Skip
-            </Button>
-            <Button onClick={handleSave} disabled={!title.trim()}>
-              Save Session
-            </Button>
-          </div>
+          <Button
+            onClick={handleSave}
+            disabled={!title.trim()}
+            className="sm:mr-auto"
+          >
+            Save Session
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

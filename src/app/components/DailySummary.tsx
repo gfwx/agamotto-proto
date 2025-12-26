@@ -1,16 +1,17 @@
-import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Clock } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-
-export interface Session {
-  id: string;
-  title: string;
-  duration: number;
-  rating: number;
-  comment: string;
-  timestamp: number;
-}
+import { useMemo } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import { Clock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import type { Session } from "../../lib/sessions";
 
 interface DailySummaryProps {
   sessions: Session[];
@@ -23,7 +24,8 @@ export function DailySummary({ sessions }: DailySummaryProps) {
     const todayTimestamp = today.getTime();
 
     const todaySessions = sessions.filter(
-      (session) => session.timestamp >= todayTimestamp
+      (session) =>
+        session.timestamp >= todayTimestamp && session.state === "completed"
     );
 
     // Group by hour
@@ -46,7 +48,8 @@ export function DailySummary({ sessions }: DailySummaryProps) {
       totalDuration: todaySessions.reduce((sum, s) => sum + s.duration, 0),
       avgRating:
         todaySessions.length > 0
-          ? todaySessions.reduce((sum, s) => sum + s.rating, 0) / todaySessions.length
+          ? todaySessions.reduce((sum, s) => sum + s.rating, 0) /
+            todaySessions.length
           : 0,
     };
   }, [sessions]);
@@ -67,17 +70,17 @@ export function DailySummary({ sessions }: DailySummaryProps) {
   };
 
   const formatHour = (hour: number) => {
-    if (hour === 0) return '12am';
+    if (hour === 0) return "12am";
     if (hour < 12) return `${hour}am`;
-    if (hour === 12) return '12pm';
+    if (hour === 12) return "12pm";
     return `${hour - 12}pm`;
   };
 
   const getBarColor = (hour: number) => {
-    if (hour < 6) return 'hsl(var(--muted))';
-    if (hour < 12) return 'hsl(var(--primary))';
-    if (hour < 18) return 'hsl(var(--primary))';
-    return 'hsl(var(--muted-foreground))';
+    if (hour < 6) return "hsl(var(--muted))";
+    if (hour < 12) return "hsl(var(--primary))";
+    if (hour < 18) return "hsl(var(--primary))";
+    return "hsl(var(--muted-foreground))";
   };
 
   return (
@@ -89,19 +92,25 @@ export function DailySummary({ sessions }: DailySummaryProps) {
       <div className="grid grid-cols-2 gap-4 px-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Time</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">
+              Total Time
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
               <Clock className="h-5 w-5 text-muted-foreground" />
-              <span className="text-2xl">{formatDuration(todayData.totalDuration)}</span>
+              <span className="text-2xl">
+                {formatDuration(todayData.totalDuration)}
+              </span>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Sessions</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">
+              Sessions
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl">{todayData.todaySessions.length}</div>
@@ -134,7 +143,10 @@ export function DailySummary({ sessions }: DailySummaryProps) {
                   />
                   <Bar dataKey="duration" radius={[4, 4, 0, 0]}>
                     {todayData.hourlyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={getBarColor(entry.hour)} />
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={getBarColor(entry.hour)}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
@@ -167,11 +179,14 @@ export function DailySummary({ sessions }: DailySummaryProps) {
                         <div className="truncate">{session.title}</div>
                         <div className="text-sm text-muted-foreground mt-1">
                           {formatDuration(session.duration)}
-                          {' • '}
-                          {new Date(session.timestamp).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
+                          {" • "}
+                          {new Date(session.timestamp).toLocaleTimeString(
+                            "en-US",
+                            {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            },
+                          )}
                         </div>
                         {session.comment && (
                           <div className="text-sm text-muted-foreground mt-1 line-clamp-2">

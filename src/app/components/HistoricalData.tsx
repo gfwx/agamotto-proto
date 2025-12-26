@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Download, Calendar } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Session } from './DailySummary';
+import type { Session } from '../../lib/sessions';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 
@@ -75,7 +75,10 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
 
   const timelineFilteredSessions = useMemo(() => {
     return sessions.filter(
-      (session) => session.timestamp >= start.getTime() && session.timestamp <= end.getTime()
+      (session) =>
+        session.timestamp >= start.getTime() &&
+        session.timestamp <= end.getTime() &&
+        session.state === "completed"
     );
   }, [sessions, start, end]);
 
@@ -117,11 +120,14 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       }));
   }, [timelineFilteredSessions]);
 
-  // Daily tables show ALL sessions, not filtered by view period
+  // Daily tables show ALL completed sessions, not filtered by view period
   const sessionsByDay = useMemo(() => {
     const grouped = new Map<string, Session[]>();
-    
+
     sessions.forEach((session) => {
+      // Only show completed sessions
+      if (session.state !== "completed") return;
+
       const date = new Date(session.timestamp);
       const dateKey = date.toLocaleDateString('en-US', {
         weekday: 'long',
@@ -129,7 +135,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
         month: 'long',
         day: 'numeric',
       });
-      
+
       if (!grouped.has(dateKey)) {
         grouped.set(dateKey, []);
       }

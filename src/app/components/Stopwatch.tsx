@@ -17,29 +17,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import type { Session } from "../../lib/sessions";
 
 interface StopwatchProps {
   onComplete: (duration: number) => void;
+  onStart: () => void;
+  onPause: () => void;
+  onResume: () => void;
   defaultStopgap: number;
   onStopgapChange: (stopgap: number) => void;
   time: number;
-  setTime: (time: number | ((prev: number) => number)) => void;
   isRunning: boolean;
-  setIsRunning: (isRunning: boolean) => void;
   isPaused: boolean;
-  setIsPaused: (isPaused: boolean) => void;
+  currentSession: Session | null;
 }
 
 export function Stopwatch({
   onComplete,
+  onStart,
+  onPause,
+  onResume,
   defaultStopgap,
   onStopgapChange,
   time,
-  setTime,
   isRunning,
-  setIsRunning,
   isPaused,
-  setIsPaused,
+  currentSession,
 }: StopwatchProps) {
   const [showStopgapDialog, setShowStopgapDialog] = useState(false);
   const [sessionStopgap, setSessionStopgap] = useState(defaultStopgap);
@@ -53,16 +56,12 @@ export function Stopwatch({
   // Check if stopgap reached
   useEffect(() => {
     if (isRunning && sessionStopgap > 0 && time >= sessionStopgap) {
-      // Cap the timer at the limit and terminate the session
-      setTime(sessionStopgap);
-      setIsRunning(false);
+      // Terminate the session at the stopgap limit
       const duration = sessionStopgap;
-      setTime(0);
-      setIsPaused(false);
       setSessionStopgap(defaultStopgap);
       onComplete(duration);
     }
-  }, [time, sessionStopgap, isRunning, onComplete, defaultStopgap, setIsRunning, setTime, setIsPaused]);
+  }, [time, sessionStopgap, isRunning, onComplete, defaultStopgap]);
 
   const formatTime = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -80,23 +79,18 @@ export function Stopwatch({
   const handleStartPause = () => {
     if (!isRunning && !isPaused) {
       // Start
-      setIsRunning(true);
+      onStart();
     } else if (isRunning) {
       // Pause
-      setIsRunning(false);
-      setIsPaused(true);
+      onPause();
     } else {
       // Resume
-      setIsRunning(true);
-      setIsPaused(false);
+      onResume();
     }
   };
 
   const handleStop = () => {
-    setIsRunning(false);
     const duration = time;
-    setTime(0);
-    setIsPaused(false);
     setSessionStopgap(defaultStopgap); // Reset to default for next session
     onComplete(duration);
   };

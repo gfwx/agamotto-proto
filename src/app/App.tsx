@@ -3,18 +3,28 @@ import { Timer, ChartBar, History } from "lucide-react";
 import { toast } from "sonner";
 import { Stopwatch } from "./components/Stopwatch";
 import { SessionDialog } from "./components/SessionDialog";
-import { DailySummary, Session } from "./components/DailySummary";
+import { DailySummary } from "./components/DailySummary";
 import { HistoricalData } from "./components/HistoricalData";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/sonner";
+import type { Session } from "../lib/sessions";
+import {
+  initDatabase,
+  saveSession,
+  getActiveSession,
+  getSessionsByState,
+  saveConfig,
+  getConfig,
+  getAllConfig,
+} from "../lib/db";
+import { exportSessionsToCSV } from "../lib/csv";
+import { setupDebugAPI } from "../lib/debug";
 
-const STORAGE_KEY = "agamotto_sessions";
-const STOPGAP_KEY = "agamotto_stopgap";
-const TIMER_STATE_KEY = "agamotto_timer_state";
-const DEFAULT_STOPGAP = 60 * 60 * 1000; // 1 hour in milliseconds
+const DEFAULT_STOPGAP = 0;
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [currentView, setCurrentView] = useState<
     "timer" | "today" | "historical"
   >("timer");
@@ -22,33 +32,19 @@ function App() {
   const [pendingDuration, setPendingDuration] = useState(0);
   const [defaultStopgap, setDefaultStopgap] = useState(DEFAULT_STOPGAP);
 
-  // Lifted timer state to persist across view changes
+  // Timer state
   const [time, setTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // New timestamp-based timing approach
-  const [initialTimestamp, setInitialTimestamp] = useState<number | null>(null);
-  const [lastPausedTimestamp, setLastPausedTimestamp] = useState<number | null>(null);
-  const [pauseTime, setPauseTime] = useState(0);
-
-  // Timer interval effect - timestamp-based for accurate background tracking
+  // Timer interval effect - updates display every 10ms
   useEffect(() => {
-    if (isRunning && !isPaused) {
-      // Set initial timestamp if not already set
-      if (!initialTimestamp) {
-        const now = Date.now();
-        setInitialTimestamp(now);
-        setLastPausedTimestamp(now);
-      }
-
-      // Update time display based on elapsed time since start minus pause time
-      intervalRef.current = setInterval(() => {
-        if (initialTimestamp) {
-          const elapsed = Date.now() - (initialTimestamp + pauseTime);
-          setTime(elapsed);
-        }
+    if (isRunning && !isPaused && currentSession) {
+      intervalRef.current = setInterval(async () => {
+        const pauseTime = (await getConfig("pauseTime")) || 0;
+        const elapsed = Date.now() - (currentSession.timestamp + pauseTime);
+        setTime(elapsed);
       }, 10);
     } else {
       if (intervalRef.current) {
@@ -61,88 +57,82 @@ function App() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isRunning, isPaused, initialTimestamp, pauseTime]);
+  }, [isRunning, isPaused, currentSession]);
 
-  // Load sessions, stopgap, and timer state from localStorage on mount
+  // Initialize IndexedDB and load data on mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    async function initialize() {
       try {
-        setSessions(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to parse stored sessions", e);
-      }
-    }
+        // Initialize IndexedDB
+        await initDatabase();
 
-    const storedStopgap = localStorage.getItem(STOPGAP_KEY);
-    if (storedStopgap) {
-      try {
-        setDefaultStopgap(parseInt(storedStopgap, 10));
-      } catch (e) {
-        console.error("Failed to parse stored stopgap", e);
-      }
-    }
+        // Setup debug API
+        setupDebugAPI();
 
-    // Restore timer state if it exists
-    const storedTimerState = localStorage.getItem(TIMER_STATE_KEY);
-    if (storedTimerState) {
-      try {
-        const state = JSON.parse(storedTimerState);
-        if (state.isRunning || state.isPaused) {
-          // Restore timestamps and pause time
-          setInitialTimestamp(state.initialTimestamp || null);
-          setLastPausedTimestamp(state.lastPausedTimestamp || null);
-          setPauseTime(state.pauseTime || 0);
-          setIsPaused(state.isPaused);
-          setIsRunning(state.isRunning);
+        // Load config
+        const config = await getAllConfig();
+        setDefaultStopgap(config.defaultStopgap || 0);
 
-          // Calculate and set current time
-          if (state.initialTimestamp) {
-            const elapsed = Date.now() - (state.initialTimestamp + (state.pauseTime || 0));
+        // Check for active session
+        const activeSession = await getActiveSession();
+
+        if (activeSession) {
+          setCurrentSession(activeSession);
+
+          // Restore timer state
+          if (activeSession.state === "active") {
+            setIsRunning(true);
+            setIsPaused(false);
+
+            // Calculate current elapsed time
+            const pauseTime = config.pauseTime || 0;
+            const elapsed = Date.now() - (activeSession.timestamp + pauseTime);
+            setTime(elapsed);
+          } else if (activeSession.state === "paused") {
+            setIsRunning(false);
+            setIsPaused(true);
+
+            // Calculate elapsed time at pause
+            const pauseTime = config.pauseTime || 0;
+            const elapsed = Date.now() - (activeSession.timestamp + pauseTime);
             setTime(elapsed);
           }
+        } else {
+          // Create not_started session
+          const newSession: Session = {
+            id: crypto.randomUUID(),
+            title: "",
+            duration: 0,
+            rating: 0,
+            comment: "",
+            timestamp: Date.now(),
+            state: "not_started",
+          };
+          await saveSession(newSession);
+          setCurrentSession(newSession);
         }
-      } catch (e) {
-        console.error("Failed to restore timer state", e);
+
+        // Load completed sessions for analytics
+        const completedSessions = await getSessionsByState("completed");
+        setSessions(completedSessions);
+      } catch (error) {
+        console.error("Initialization failed:", error);
+        toast.error("Failed to initialize app");
       }
     }
+
+    initialize();
   }, []);
 
-  // Save sessions to localStorage whenever they change
-  useEffect(() => {
-    if (sessions.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
-    }
-  }, [sessions]);
-
-  // Handle pause/resume logic - track pause time
-  useEffect(() => {
-    if (isPaused && lastPausedTimestamp === null && initialTimestamp) {
-      // When pausing, record the timestamp only once
-      setLastPausedTimestamp(Date.now());
-    } else if (isRunning && !isPaused && lastPausedTimestamp !== null && initialTimestamp) {
-      // When resuming from pause, add to pause_time
-      const pauseDuration = Date.now() - lastPausedTimestamp;
-      setPauseTime(prev => prev + pauseDuration);
-      setLastPausedTimestamp(null);
-    }
-  }, [isRunning, isPaused]);
 
   // Page Visibility API - handle app backgrounding/foregrounding
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // App went to background - update time display
-        if (isRunning && !isPaused && initialTimestamp) {
-          const elapsed = Date.now() - (initialTimestamp + pauseTime);
-          setTime(elapsed);
-        }
-      } else {
-        // App came to foreground - timer will continue automatically
-        if (isRunning && !isPaused && initialTimestamp) {
-          const elapsed = Date.now() - (initialTimestamp + pauseTime);
-          setTime(elapsed);
-        }
+    const handleVisibilityChange = async () => {
+      if (!document.hidden && isRunning && !isPaused && currentSession) {
+        // App came to foreground - update time display
+        const pauseTime = (await getConfig("pauseTime")) || 0;
+        const elapsed = Date.now() - (currentSession.timestamp + pauseTime);
+        setTime(elapsed);
       }
     };
 
@@ -151,52 +141,137 @@ function App() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isRunning, isPaused, initialTimestamp, pauseTime]);
+  }, [isRunning, isPaused, currentSession]);
 
-  // Persist timer state to localStorage
-  useEffect(() => {
-    if (isRunning || isPaused) {
-      const timerState = {
-        isRunning,
-        isPaused,
-        initialTimestamp,
-        lastPausedTimestamp,
-        pauseTime,
+  const handleStart = async () => {
+    if (!currentSession) return;
+
+    try {
+      const updatedSession: Session = {
+        ...currentSession,
+        timestamp: Date.now(), // Set creation time
+        state: "active",
       };
 
-      localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(timerState));
-    } else {
-      // Clear timer state when stopped
-      localStorage.removeItem(TIMER_STATE_KEY);
-      setInitialTimestamp(null);
-      setLastPausedTimestamp(null);
-      setPauseTime(0);
+      await saveSession(updatedSession);
+      setCurrentSession(updatedSession);
+      setIsRunning(true);
+      setIsPaused(false);
+    } catch (error) {
+      console.error("Failed to start session:", error);
+      toast.error("Failed to start timer");
     }
-  }, [isRunning, isPaused, initialTimestamp, lastPausedTimestamp, pauseTime, time]);
+  };
+
+  const handlePause = async () => {
+    if (!currentSession) return;
+
+    try {
+      await saveConfig("lastPausedTimestamp", Date.now());
+
+      const updatedSession: Session = {
+        ...currentSession,
+        state: "paused",
+      };
+
+      await saveSession(updatedSession);
+      setCurrentSession(updatedSession);
+      setIsRunning(false);
+      setIsPaused(true);
+    } catch (error) {
+      console.error("Failed to pause session:", error);
+      toast.error("Failed to pause timer");
+    }
+  };
+
+  const handleResume = async () => {
+    if (!currentSession) return;
+
+    try {
+      const lastPausedTimestamp = await getConfig("lastPausedTimestamp");
+      const currentPauseTime = (await getConfig("pauseTime")) || 0;
+
+      if (lastPausedTimestamp) {
+        const pauseDuration = Date.now() - lastPausedTimestamp;
+        await saveConfig("pauseTime", currentPauseTime + pauseDuration);
+        await saveConfig("lastPausedTimestamp", null);
+      }
+
+      const updatedSession: Session = {
+        ...currentSession,
+        state: "active",
+      };
+
+      await saveSession(updatedSession);
+      setCurrentSession(updatedSession);
+      setIsRunning(true);
+      setIsPaused(false);
+    } catch (error) {
+      console.error("Failed to resume session:", error);
+      toast.error("Failed to resume timer");
+    }
+  };
 
   const handleStopwatchComplete = (duration: number) => {
     setPendingDuration(duration);
     setShowDialog(true);
   };
 
-  const handleSaveSession = (data: {
+  const handleSaveSession = async (data: {
     title: string;
     rating: number;
     comment: string;
   }) => {
-    const newSession: Session = {
-      id: crypto.randomUUID(),
-      title: data.title,
-      duration: pendingDuration,
-      rating: data.rating,
-      comment: data.comment,
-      timestamp: Date.now(),
-    };
+    if (!currentSession) return;
 
-    setSessions((prev) => [...prev, newSession]);
-    setShowDialog(false);
-    setPendingDuration(0);
-    toast.success("Session saved.");
+    try {
+      const pauseTime = (await getConfig("pauseTime")) || 0;
+      const finalDuration = Date.now() - currentSession.timestamp - pauseTime;
+
+      const completedSession: Session = {
+        ...currentSession,
+        title: data.title,
+        duration: finalDuration,
+        rating: data.rating,
+        comment: data.comment,
+        state: "completed",
+      };
+
+      await saveSession(completedSession);
+
+      // Reset pause tracking
+      await saveConfig("pauseTime", 0);
+      await saveConfig("lastPausedTimestamp", null);
+
+      // Create new not_started session
+      const newSession: Session = {
+        id: crypto.randomUUID(),
+        title: "",
+        duration: 0,
+        rating: 0,
+        comment: "",
+        timestamp: Date.now(),
+        state: "not_started",
+      };
+      await saveSession(newSession);
+      setCurrentSession(newSession);
+
+      // Reset timer UI
+      setTime(0);
+      setIsRunning(false);
+      setIsPaused(false);
+
+      // Refresh analytics
+      const completedSessions = await getSessionsByState("completed");
+      setSessions(completedSessions);
+
+      setShowDialog(false);
+      setPendingDuration(0);
+      toast.success("Session saved.");
+    } catch (error) {
+      console.error("Failed to save session:", error);
+      toast.error("Failed to save session");
+    }
   };
 
   const handleCancelSession = () => {
@@ -204,54 +279,65 @@ function App() {
     setPendingDuration(0);
   };
 
-  const handleDiscardSession = () => {
-    setShowDialog(false);
-    setPendingDuration(0);
-    toast.error("Session discarded.");
+  const handleDiscardSession = async () => {
+    if (!currentSession) return;
+
+    try {
+      const pauseTime = (await getConfig("pauseTime")) || 0;
+      const finalDuration = Date.now() - currentSession.timestamp - pauseTime;
+
+      const abortedSession: Session = {
+        ...currentSession,
+        duration: finalDuration,
+        state: "aborted",
+      };
+
+      await saveSession(abortedSession);
+
+      // Reset pause tracking
+      await saveConfig("pauseTime", 0);
+      await saveConfig("lastPausedTimestamp", null);
+
+      // Create new not_started session
+      const newSession: Session = {
+        id: crypto.randomUUID(),
+        title: "",
+        duration: 0,
+        rating: 0,
+        comment: "",
+        timestamp: Date.now(),
+        state: "not_started",
+      };
+      await saveSession(newSession);
+      setCurrentSession(newSession);
+
+      // Reset timer UI
+      setTime(0);
+      setIsRunning(false);
+      setIsPaused(false);
+
+      setShowDialog(false);
+      setPendingDuration(0);
+      toast.error("Session discarded.");
+    } catch (error) {
+      console.error("Failed to discard session:", error);
+      toast.error("Failed to discard session");
+    }
   };
 
-  const handleStopgapChange = (stopgap: number) => {
+  const handleStopgapChange = async (stopgap: number) => {
     setDefaultStopgap(stopgap);
-    localStorage.setItem(STOPGAP_KEY, String(stopgap));
+    await saveConfig("defaultStopgap", stopgap);
   };
 
-  const handleExportCSV = () => {
-    if (sessions.length === 0) return;
-
-    const headers = [
-      "Date",
-      "Time",
-      "Title",
-      "Duration (seconds)",
-      "Rating",
-      "Comment",
-    ];
-    const rows = sessions.map((session) => {
-      const date = new Date(session.timestamp);
-      return [
-        date.toLocaleDateString(),
-        date.toLocaleTimeString(),
-        session.title,
-        Math.floor(session.duration / 1000),
-        session.rating,
-        session.comment.replace(/"/g, '""'), // Escape quotes
-      ];
-    });
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `agamotto_export_${Date.now()}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportCSV = async () => {
+    try {
+      const completedSessions = await getSessionsByState("completed");
+      exportSessionsToCSV(completedSessions);
+    } catch (error) {
+      console.error("Failed to export CSV:", error);
+      toast.error("Failed to export data");
+    }
   };
 
   return (
@@ -347,14 +433,15 @@ function App() {
           {currentView === "timer" ? (
             <Stopwatch
               onComplete={handleStopwatchComplete}
+              onStart={handleStart}
+              onPause={handlePause}
+              onResume={handleResume}
               defaultStopgap={defaultStopgap}
               onStopgapChange={handleStopgapChange}
               time={time}
-              setTime={setTime}
               isRunning={isRunning}
-              setIsRunning={setIsRunning}
               isPaused={isPaused}
-              setIsPaused={setIsPaused}
+              currentSession={currentSession}
             />
           ) : currentView === "today" ? (
             <div className="py-6">
