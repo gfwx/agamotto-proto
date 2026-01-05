@@ -13,6 +13,7 @@ export function exportSessionsToCSV(sessions: Session[]): void {
     "Duration (seconds)",
     "Rating",
     "Comment",
+    "Tag",
     "State",
   ];
 
@@ -25,6 +26,7 @@ export function exportSessionsToCSV(sessions: Session[]): void {
       Math.floor(session.duration / 1000),
       session.rating,
       session.comment.replace(/"/g, '""'), // Escape quotes
+      session.tag?.name || "",
       session.state,
     ];
   });

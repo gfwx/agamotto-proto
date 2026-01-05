@@ -82,6 +82,13 @@ function App() {
         if (activeSession) {
           setCurrentSession(activeSession);
 
+          // Restore tag from session or config
+          if (activeSession.tag) {
+            setCurrentTag(activeSession.tag);
+          } else if (config.currentTag) {
+            setCurrentTag(config.currentTag);
+          }
+
           // Restore timer state
           if (activeSession.state === "active") {
             setIsRunning(true);
@@ -101,6 +108,11 @@ function App() {
             setTime(elapsed);
           }
         } else {
+          // Load persisted tag even if no active session
+          if (config.currentTag) {
+            setCurrentTag(config.currentTag);
+          }
+
           // Create not_started session
           const newSession: Session = {
             id: crypto.randomUUID(),
@@ -110,6 +122,7 @@ function App() {
             comment: "",
             timestamp: Date.now(),
             state: "not_started",
+            tag: config.currentTag || null,
           };
           await saveSession(newSession);
           setCurrentSession(newSession);
@@ -126,6 +139,47 @@ function App() {
 
     initialize();
   }, []);
+
+  // Persist current tag to config and update session
+  // Use ref to track if we're in the middle of completing a session to prevent race conditions
+  const isCompletingSessionRef = useRef(false);
+
+  useEffect(() => {
+    async function persistTag() {
+      // Skip if we're completing a session to avoid race conditions
+      if (isCompletingSessionRef.current) {
+        return;
+      }
+
+      try {
+        await saveConfig("currentTag", currentTag);
+
+        // Also update the current session's tag if it's active or paused
+        // Only update if the tag has actually changed to avoid infinite loops
+        const currentTagName = currentTag?.name ?? null;
+        const sessionTagName = currentSession?.tag?.name ?? null;
+
+        if (
+          currentSession &&
+          (currentSession.state === "active" ||
+            currentSession.state === "paused" ||
+            currentSession.state === "not_started") &&
+          sessionTagName !== currentTagName
+        ) {
+          const updatedSession: Session = {
+            ...currentSession,
+            tag: currentTag,
+          };
+          await saveSession(updatedSession);
+          setCurrentSession(updatedSession);
+        }
+      } catch (error) {
+        console.error("Failed to persist tag:", error);
+      }
+    }
+
+    persistTag();
+  }, [currentTag, currentSession]);
 
   // Page Visibility API - handle app backgrounding/foregrounding
   useEffect(() => {
@@ -228,6 +282,9 @@ function App() {
     if (!currentSession) return;
 
     try {
+      // Set flag to prevent tag persistence effect from running during completion
+      isCompletingSessionRef.current = true;
+
       const pauseTime = (await getConfig("pauseTime")) || 0;
       const finalDuration = Date.now() - currentSession.timestamp - pauseTime;
 
@@ -253,6 +310,10 @@ function App() {
       await saveConfig("pauseTime", 0);
       await saveConfig("lastPausedTimestamp", null);
 
+      // Reset tag
+      setCurrentTag(null);
+      await saveConfig("currentTag", null);
+
       // Create new not_started session
       const newSession: Session = {
         id: crypto.randomUUID(),
@@ -262,6 +323,7 @@ function App() {
         comment: "",
         timestamp: Date.now(),
         state: "not_started",
+        tag: null,
       };
       await saveSession(newSession);
       setCurrentSession(newSession);
@@ -271,9 +333,6 @@ function App() {
       setIsRunning(false);
       setIsPaused(false);
 
-      // Reset tag
-      setCurrentTag(null);
-
       // Refresh analytics
       const completedSessions = await getSessionsByState("completed");
       setSessions(completedSessions);
@@ -281,9 +340,14 @@ function App() {
       setShowDialog(false);
       setPendingDuration(0);
       toast.success("Session saved.");
+
+      // Clear flag after completion
+      isCompletingSessionRef.current = false;
     } catch (error) {
       console.error("Failed to save session:", error);
       toast.error("Failed to save session");
+      // Clear flag on error too
+      isCompletingSessionRef.current = false;
     }
   };
 
@@ -296,6 +360,9 @@ function App() {
     if (!currentSession) return;
 
     try {
+      // Set flag to prevent tag persistence effect from running during completion
+      isCompletingSessionRef.current = true;
+
       const pauseTime = (await getConfig("pauseTime")) || 0;
       const finalDuration = Date.now() - currentSession.timestamp - pauseTime;
 
@@ -317,6 +384,10 @@ function App() {
       await saveConfig("pauseTime", 0);
       await saveConfig("lastPausedTimestamp", null);
 
+      // Reset tag
+      setCurrentTag(null);
+      await saveConfig("currentTag", null);
+
       // Create new not_started session
       const newSession: Session = {
         id: crypto.randomUUID(),
@@ -326,6 +397,7 @@ function App() {
         comment: "",
         timestamp: Date.now(),
         state: "not_started",
+        tag: null,
       };
       await saveSession(newSession);
       setCurrentSession(newSession);
@@ -335,15 +407,17 @@ function App() {
       setIsRunning(false);
       setIsPaused(false);
 
-      // Reset tag
-      setCurrentTag(null);
-
       setShowDialog(false);
       setPendingDuration(0);
       toast.error("Session discarded.");
+
+      // Clear flag after completion
+      isCompletingSessionRef.current = false;
     } catch (error) {
       console.error("Failed to discard session:", error);
       toast.error("Failed to discard session");
+      // Clear flag on error too
+      isCompletingSessionRef.current = false;
     }
   };
 

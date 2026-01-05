@@ -6,6 +6,7 @@ import { Tag } from "./ui/tag";
 import type { Session } from "../../lib/db/appSessionUtil";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
 
 interface HistoricalDataProps {
   sessions: Session[];
@@ -18,6 +19,9 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("hourly");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [pieChartViewMode, setPieChartViewMode] = useState<ViewMode>("hourly");
+  const [pieChartCustomStartDate, setPieChartCustomStartDate] = useState("");
+  const [pieChartCustomEndDate, setPieChartCustomEndDate] = useState("");
   const [zoomLevel, setZoomLevel] = useState(100); // 100% = default, up to 1000% for minute precision
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [hoveredSession, setHoveredSession] = useState<{
@@ -73,6 +77,101 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   };
 
   const { start, end } = getDateRange();
+
+  const getPieChartDateRange = () => {
+    const now = new Date();
+    let start: Date;
+    let end: Date;
+
+    switch (pieChartViewMode) {
+      case "hourly":
+        // Show only last 24 hours
+        start = new Date(now);
+        start.setHours(start.getHours() - 24);
+        end = new Date(now);
+        break;
+      case "weekly":
+        // Show last 7 days
+        start = new Date(now);
+        start.setDate(start.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(now);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case "custom":
+        // Show custom date range
+        if (pieChartCustomStartDate && pieChartCustomEndDate) {
+          start = new Date(pieChartCustomStartDate);
+          start.setHours(0, 0, 0, 0);
+          end = new Date(pieChartCustomEndDate);
+          end.setHours(23, 59, 59, 999);
+        } else {
+          // Default to last 24 hours if dates not set
+          start = new Date(now);
+          start.setHours(start.getHours() - 24);
+          end = new Date(now);
+        }
+        break;
+      default:
+        start = new Date(now);
+        start.setHours(start.getHours() - 24);
+        end = new Date(now);
+    }
+
+    return { start, end };
+  };
+
+  const pieChartDateRange = getPieChartDateRange();
+
+  // Calculate tag duration distribution for pie chart
+  const tagDurationData = useMemo(() => {
+    const filteredSessions = sessions.filter(
+      (session) =>
+        session.timestamp >= pieChartDateRange.start.getTime() &&
+        session.timestamp <= pieChartDateRange.end.getTime() &&
+        session.state === "completed",
+    );
+
+    // Group by tag
+    const tagDurations = new Map<string, { duration: number; color: string }>();
+    let untaggedDuration = 0;
+
+    filteredSessions.forEach((session) => {
+      if (session.tag) {
+        const existing = tagDurations.get(session.tag.name) || {
+          duration: 0,
+          color: session.tag.color,
+        };
+        tagDurations.set(session.tag.name, {
+          duration: existing.duration + session.duration,
+          color: session.tag.color,
+        });
+      } else {
+        untaggedDuration += session.duration;
+      }
+    });
+
+    // Convert to array for recharts (keep duration in milliseconds for precision)
+    const data = Array.from(tagDurations.entries()).map(([name, data]) => ({
+      name,
+      value: data.duration, // Keep in milliseconds
+      color: data.color,
+    }));
+
+    // Add untagged sessions if any
+    if (untaggedDuration > 0) {
+      data.push({
+        name: "Untagged",
+        value: untaggedDuration, // Keep in milliseconds
+        color: "#9CA3AF", // Gray color for untagged
+      });
+    }
+
+    // Sort by duration descending
+    data.sort((a, b) => b.value - a.value);
+
+    return data;
+  }, [sessions, pieChartDateRange]);
 
   const timelineFilteredSessions = useMemo(() => {
     return sessions.filter(
@@ -163,6 +262,20 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       return `${minutes}m ${seconds}s`;
     }
     return `${seconds}s`;
+  };
+
+  const formatPieChartDuration = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+
+    return parts.join(" ");
   };
 
   const formatTime = (date: Date) => {
@@ -360,6 +473,131 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
         </div>
       </div>
 
+      {/* Tag Duration Pie Chart */}
+      {tagDurationData.length > 0 ? (
+        <div className="px-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">
+                Session Duration by Tag
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={tagDurationData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => {
+                        const totalDuration = tagDurationData.reduce(
+                          (sum, d) => sum + d.value,
+                          0,
+                        );
+                        const percentage = ((value / totalDuration) * 100).toFixed(
+                          1,
+                        );
+                        return `${name}: ${formatPieChartDuration(value)} (${percentage}%)`;
+                      }}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {tagDurationData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      formatter={(value, entry: any) =>
+                        `${value} (${formatPieChartDuration(entry.payload.value)})`
+                      }
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                {/* Pie Chart Period Controls */}
+                <div className="bg-muted/50 rounded-lg p-4 space-y-4">
+                  <div className="text-sm font-medium">Chart Period</div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={
+                        pieChartViewMode === "hourly" ? "default" : "outline"
+                      }
+                      onClick={() => setPieChartViewMode("hourly")}
+                    >
+                      Last 24h
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={
+                        pieChartViewMode === "weekly" ? "default" : "outline"
+                      }
+                      onClick={() => setPieChartViewMode("weekly")}
+                    >
+                      Weekly
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={
+                        pieChartViewMode === "custom" ? "default" : "outline"
+                      }
+                      onClick={() => setPieChartViewMode("custom")}
+                    >
+                      Custom
+                    </Button>
+                  </div>
+
+                  {pieChartViewMode === "custom" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="pie-start-date" className="text-xs">
+                          Start Date
+                        </Label>
+                        <Input
+                          id="pie-start-date"
+                          type="date"
+                          value={pieChartCustomStartDate}
+                          onChange={(e) =>
+                            setPieChartCustomStartDate(e.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pie-end-date" className="text-xs">
+                          End Date
+                        </Label>
+                        <Input
+                          id="pie-end-date"
+                          type="date"
+                          value={pieChartCustomEndDate}
+                          onChange={(e) =>
+                            setPieChartCustomEndDate(e.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="px-6">
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No tagged sessions in selected period</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Gantt Chart */}
       {ganttData.length > 0 ? (
         <div className="px-6 space-y-2">
@@ -449,24 +687,38 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                               (s) => s.id === item.id,
                             )!;
 
+                            // Use tag color if available, otherwise use default primary color
+                            const bgColor = originalSession.tag
+                              ? originalSession.tag.color
+                              : "hsl(var(--primary))";
+                            const hoverBgColor = originalSession.tag
+                              ? `${originalSession.tag.color}E6` // Add opacity for hover
+                              : "hsl(var(--primary))";
+
                             return (
                               <div
                                 key={item.id}
-                                className="absolute h-7 rounded bg-primary/80 hover:bg-primary transition-colors flex items-center px-2 overflow-hidden cursor-pointer"
+                                className="absolute h-7 rounded transition-colors flex items-center px-2 overflow-hidden cursor-pointer"
                                 style={{
                                   left: `${leftPx}px`,
                                   width: `${widthPx}px`,
                                   top: `${idx * 32}px`,
+                                  backgroundColor: bgColor,
+                                  opacity: 0.8,
                                 }}
-                                onMouseEnter={(e) =>
-                                  handleSessionHover(originalSession, e)
-                                }
+                                onMouseEnter={(e) => {
+                                  handleSessionHover(originalSession, e);
+                                  e.currentTarget.style.opacity = "1";
+                                }}
                                 onMouseMove={(e) =>
                                   handleMouseMove(originalSession, e)
                                 }
-                                onMouseLeave={handleSessionLeave}
+                                onMouseLeave={(e) => {
+                                  handleSessionLeave();
+                                  e.currentTarget.style.opacity = "0.8";
+                                }}
                               >
-                                <span className="text-xs text-primary-foreground truncate">
+                                <span className="text-xs text-white truncate">
                                   {item.title}
                                 </span>
                               </div>
