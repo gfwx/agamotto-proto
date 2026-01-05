@@ -1,5 +1,5 @@
 import { initDatabase } from "./db";
-import { SESSIONS_STORE } from "./constants";
+import { SESSIONS_STORE } from "../constants";
 
 export interface Session {
   id: string;

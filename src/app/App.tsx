@@ -7,17 +7,15 @@ import { DailySummary } from "./components/DailySummary";
 import { HistoricalData } from "./components/HistoricalData";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/sonner";
-import type { Session } from "../lib/sessions";
+import type { Session } from "../lib/db/appSessionUtil";
+import { initDatabase } from "../lib/db/db";
 import {
-  initDatabase,
   saveSession,
   getActiveSession,
   getSessionsByState,
-  saveConfig,
-  getConfig,
-  getAllConfig,
-} from "../lib/db";
-import { exportSessionsToCSV } from "../lib/csv";
+} from "../lib/db/appSessionUtil";
+import { saveConfig, getConfig, getAllConfig } from "../lib/db/appConfigUtil";
+import { exportSessionsToCSV } from "../lib/csvExportUtil";
 import { setupDebugAPI } from "../lib/debug";
 
 const DEFAULT_STOPGAP = 0;

@@ -4,7 +4,7 @@
 // application state. It's all dervied from global state, with the help of cached data ie. "config".
 
 import { initDatabase } from "./db";
-import { CONFIG_STORE } from "./constants";
+import { CONFIG_STORE } from "../constants";
 
 export interface ConfigRecord {
   key: string;

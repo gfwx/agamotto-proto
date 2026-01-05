@@ -1,4 +1,9 @@
-import { DB_NAME, DB_VERSION, CONFIG_STORE, SESSIONS_STORE } from "./constants";
+import {
+  DB_NAME,
+  DB_VERSION,
+  CONFIG_STORE,
+  SESSIONS_STORE,
+} from "../constants";
 import { migrateFromLocalStorage } from "./appMigrationUtil";
 let dbInstance: IDBDatabase | null = null;
 
@@ -31,7 +36,7 @@ export async function initDatabase(): Promise<IDBDatabase> {
       // Run migration after database is opened
       if (needsMigration) {
         try {
-          await migrateFromLocalStorage();
+          await migrateFromLocalStorage(dbInstance);
         } catch (error) {
           console.error("Migration failed:", error);
           // Continue anyway - migration can be retried

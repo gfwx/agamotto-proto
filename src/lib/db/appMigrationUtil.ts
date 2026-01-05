@@ -1,12 +1,11 @@
-import { initDatabase } from "./db";
-import type { Session } from "./appSession";
-import { SESSIONS_STORE } from "./constants";
-import { saveConfig } from "./appConfig";
+import type { Session } from "./appSessionUtil";
+import { SESSIONS_STORE } from "../constants";
+import { saveConfig } from "./appConfigUtil";
 
 /**
  * Migrate data from localStorage to IndexedDB
  */
-export async function migrateFromLocalStorage(): Promise<void> {
+export async function migrateFromLocalStorage(db: IDBDatabase): Promise<void> {
   console.log("Starting localStorage → IndexedDB migration");
 
   try {

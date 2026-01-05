@@ -1,4 +1,4 @@
-import type { Session } from "./sessions";
+import type { Session } from "./db/appSessionUtil";
 
 /**
  * Export sessions to CSV file

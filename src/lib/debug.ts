@@ -1,4 +1,5 @@
-import { getAllSessions, getAllConfig, getActiveSession } from "./db";
+import { getAllSessions, getActiveSession } from "./db/appSessionUtil";
+import { getAllConfig } from "./db/appConfigUtil";
 
 /**
  * Setup debug API functions on window object
