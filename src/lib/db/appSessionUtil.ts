@@ -1,5 +1,6 @@
 import { initDatabase } from "./db";
 import { SESSIONS_STORE } from "../constants";
+import type { Tag } from "./appTagUtil";
 
 export interface Session {
   id: string;
@@ -9,6 +10,7 @@ export interface Session {
   comment: string;
   timestamp: number;
   state: "active" | "completed" | "aborted" | "paused" | "not_started";
+  tag: Tag | null;
 }
 
 export async function saveSession(session: Session): Promise<void> {

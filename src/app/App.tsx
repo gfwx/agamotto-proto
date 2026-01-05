@@ -8,12 +8,17 @@ import { HistoricalData } from "./components/HistoricalData";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/sonner";
 import type { Session } from "../lib/db/appSessionUtil";
+import type { Tag } from "../lib/db/appTagUtil";
 import { initDatabase } from "../lib/db/db";
 import {
   saveSession,
   getActiveSession,
   getSessionsByState,
 } from "../lib/db/appSessionUtil";
+import {
+  incrementTagInstances,
+  updateTagLastUsed,
+} from "../lib/db/appTagUtil";
 import { DEFAULT_STOPGAP } from "../lib/constants";
 import { saveConfig, getConfig, getAllConfig } from "../lib/db/appConfigUtil";
 import { exportSessionsToCSV } from "../lib/csvExportUtil";
@@ -28,6 +33,7 @@ function App() {
   const [showDialog, setShowDialog] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
   const [defaultStopgap, setDefaultStopgap] = useState(DEFAULT_STOPGAP);
+  const [currentTag, setCurrentTag] = useState<Tag | null>(null);
 
   // Timer state
   const [time, setTime] = useState(0);
@@ -217,6 +223,7 @@ function App() {
     title: string;
     rating: number;
     comment: string;
+    tag: Tag | null;
   }) => {
     if (!currentSession) return;
 
@@ -231,9 +238,16 @@ function App() {
         rating: data.rating,
         comment: data.comment,
         state: "completed",
+        tag: data.tag,
       };
 
       await saveSession(completedSession);
+
+      // Increment tag instances if tag was used
+      if (data.tag) {
+        await incrementTagInstances(data.tag.name);
+        await updateTagLastUsed(data.tag.name);
+      }
 
       // Reset pause tracking
       await saveConfig("pauseTime", 0);
@@ -256,6 +270,9 @@ function App() {
       setTime(0);
       setIsRunning(false);
       setIsPaused(false);
+
+      // Reset tag
+      setCurrentTag(null);
 
       // Refresh analytics
       const completedSessions = await getSessionsByState("completed");
@@ -286,9 +303,15 @@ function App() {
         ...currentSession,
         duration: finalDuration,
         state: "aborted",
+        tag: currentTag,
       };
 
       await saveSession(abortedSession);
+
+      // Update dateLastUsed but not totalInstances
+      if (currentTag) {
+        await updateTagLastUsed(currentTag.name);
+      }
 
       // Reset pause tracking
       await saveConfig("pauseTime", 0);
@@ -311,6 +334,9 @@ function App() {
       setTime(0);
       setIsRunning(false);
       setIsPaused(false);
+
+      // Reset tag
+      setCurrentTag(null);
 
       setShowDialog(false);
       setPendingDuration(0);
@@ -438,6 +464,8 @@ function App() {
               isRunning={isRunning}
               isPaused={isPaused}
               currentSession={currentSession}
+              currentTag={currentTag}
+              onTagChange={setCurrentTag}
             />
           ) : currentView === "today" ? (
             <div className="py-6">
@@ -454,6 +482,7 @@ function App() {
         <SessionDialog
           open={showDialog}
           duration={pendingDuration}
+          initialTag={currentTag}
           onSave={handleSaveSession}
           onCancel={handleCancelSession}
           onDiscard={handleDiscardSession}

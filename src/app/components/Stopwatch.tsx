@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import type { Session } from "../../lib/db/appSessionUtil";
+import type { Tag } from "../../lib/db/appTagUtil";
+import { TagSelector } from "./ui/tag-selector";
 
 interface StopwatchProps {
   onComplete: (duration: number) => void;
@@ -30,6 +32,8 @@ interface StopwatchProps {
   isRunning: boolean;
   isPaused: boolean;
   currentSession: Session | null;
+  currentTag: Tag | null;
+  onTagChange: (tag: Tag | null) => void;
 }
 
 export function Stopwatch({
@@ -43,6 +47,8 @@ export function Stopwatch({
   isRunning,
   isPaused,
   currentSession,
+  currentTag,
+  onTagChange,
 }: StopwatchProps) {
   const [showStopgapDialog, setShowStopgapDialog] = useState(false);
   const [sessionStopgap, setSessionStopgap] = useState(defaultStopgap);
@@ -201,6 +207,11 @@ export function Stopwatch({
             Change limit
           </Button>
         )}
+
+        {/* Tag Selector */}
+        <div className="mt-6 w-full max-w-xs">
+          <TagSelector value={currentTag} onChange={onTagChange} disabled={false} />
+        </div>
       </div>
 
       {/* Stopgap Configuration Dialog */}

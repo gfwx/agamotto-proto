@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,11 +11,19 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { Star } from "lucide-react";
+import type { Tag } from "../../lib/db/appTagUtil";
+import { TagSelector } from "./ui/tag-selector";
 
 interface SessionDialogProps {
   open: boolean;
   duration: number;
-  onSave: (data: { title: string; rating: number; comment: string }) => void;
+  initialTag?: Tag | null;
+  onSave: (data: {
+    title: string;
+    rating: number;
+    comment: string;
+    tag: Tag | null;
+  }) => void;
   onCancel: () => void;
   onDiscard: () => void;
 }
@@ -23,6 +31,7 @@ interface SessionDialogProps {
 export function SessionDialog({
   open,
   duration,
+  initialTag,
   onSave,
   onCancel,
   onDiscard,
@@ -30,7 +39,15 @@ export function SessionDialog({
   const [title, setTitle] = useState("");
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [selectedTag, setSelectedTag] = useState<Tag | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  // Initialize tag from props when dialog opens
+  useEffect(() => {
+    if (open && initialTag) {
+      setSelectedTag(initialTag);
+    }
+  }, [open, initialTag]);
 
   const formatDuration = (milliseconds: number) => {
     const totalSeconds = Math.floor(milliseconds / 1000);
@@ -48,11 +65,12 @@ export function SessionDialog({
   };
 
   const handleSave = () => {
-    onSave({ title, rating, comment });
+    onSave({ title, rating, comment, tag: selectedTag });
     // Reset form
     setTitle("");
     setRating(0);
     setComment("");
+    setSelectedTag(null);
     setShowDiscardConfirm(false);
   };
 
@@ -62,6 +80,7 @@ export function SessionDialog({
     setTitle("");
     setRating(0);
     setComment("");
+    setSelectedTag(null);
     setShowDiscardConfirm(false);
   };
 
@@ -74,6 +93,7 @@ export function SessionDialog({
       setTitle("");
       setRating(0);
       setComment("");
+      setSelectedTag(null);
       setShowDiscardConfirm(false);
     }
   };
@@ -126,6 +146,11 @@ export function SessionDialog({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tag (optional)</Label>
+            <TagSelector value={selectedTag} onChange={setSelectedTag} />
           </div>
 
           <div className="space-y-2">

@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { Download, Calendar } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Tag } from "./ui/tag";
 import type { Session } from "../../lib/db/appSessionUtil";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
@@ -289,6 +290,14 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
+              {hoveredSession.session.tag && (
+                <div className="mb-2">
+                  <Tag
+                    name={hoveredSession.session.tag.name}
+                    color={hoveredSession.session.tag.color}
+                  />
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Start:</span>
                 <span className="font-medium">
@@ -566,6 +575,14 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="truncate">{session.title}</div>
+                          {session.tag && (
+                            <div className="mt-1">
+                              <Tag
+                                name={session.tag.name}
+                                color={session.tag.color}
+                              />
+                            </div>
+                          )}
                           <div className="text-sm text-muted-foreground mt-1">
                             {formatTime(new Date(session.timestamp))}
                             {" • "}

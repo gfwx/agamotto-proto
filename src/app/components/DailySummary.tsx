@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Tag } from "./ui/tag";
 import type { Session } from "../../lib/db/appSessionUtil";
 
 interface DailySummaryProps {
@@ -177,6 +178,14 @@ export function DailySummary({ sessions }: DailySummaryProps) {
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="truncate">{session.title}</div>
+                        {session.tag && (
+                          <div className="mt-1">
+                            <Tag
+                              name={session.tag.name}
+                              color={session.tag.color}
+                            />
+                          </div>
+                        )}
                         <div className="text-sm text-muted-foreground mt-1">
                           {formatDuration(session.duration)}
                           {" • "}
