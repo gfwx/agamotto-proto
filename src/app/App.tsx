@@ -124,7 +124,6 @@ function App() {
     initialize();
   }, []);
 
-
   // Page Visibility API - handle app backgrounding/foregrounding
   useEffect(() => {
     const handleVisibilityChange = async () => {
