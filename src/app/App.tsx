@@ -14,11 +14,10 @@ import {
   getActiveSession,
   getSessionsByState,
 } from "../lib/db/appSessionUtil";
+import { DEFAULT_STOPGAP } from "../lib/constants";
 import { saveConfig, getConfig, getAllConfig } from "../lib/db/appConfigUtil";
 import { exportSessionsToCSV } from "../lib/csvExportUtil";
 import { setupDebugAPI } from "../lib/debug";
-
-const DEFAULT_STOPGAP = 0;
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -36,14 +35,14 @@ function App() {
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timer interval effect - updates display every 10ms
+  // Timer interval effect - updates display every 100ms
   useEffect(() => {
     if (isRunning && !isPaused && currentSession) {
       intervalRef.current = setInterval(async () => {
         const pauseTime = (await getConfig("pauseTime")) || 0;
         const elapsed = Date.now() - (currentSession.timestamp + pauseTime);
         setTime(elapsed);
-      }, 10);
+      }, 100);
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

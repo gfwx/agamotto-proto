@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import type { Session } from "../../lib/sessions";
+import type { Session } from "../../lib/db/appSessionUtil";
 
 interface StopwatchProps {
   onComplete: (duration: number) => void;
@@ -68,12 +68,11 @@ export function Stopwatch({
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
-    const ms = Math.floor((milliseconds % 1000) / 10);
 
     if (hours > 0) {
-      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(1, "0")}`;
     }
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
 
   const handleStartPause = () => {

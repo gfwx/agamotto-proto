@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import type { Session } from "../../lib/sessions";
+import type { Session } from "../../lib/db/appSessionUtil";
 
 interface DailySummaryProps {
   sessions: Session[];
@@ -25,7 +25,7 @@ export function DailySummary({ sessions }: DailySummaryProps) {
 
     const todaySessions = sessions.filter(
       (session) =>
-        session.timestamp >= todayTimestamp && session.state === "completed"
+        session.timestamp >= todayTimestamp && session.state === "completed",
     );
 
     // Group by hour

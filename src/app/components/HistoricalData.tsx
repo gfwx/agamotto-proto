@@ -1,22 +1,22 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Download, Calendar } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import type { Session } from '../../lib/sessions';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
+import { useState, useMemo, useRef, useEffect } from "react";
+import { Download, Calendar } from "lucide-react";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import type { Session } from "../../lib/db/appSessionUtil";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
 
 interface HistoricalDataProps {
   sessions: Session[];
   onExport: () => void;
 }
 
-type ViewMode = 'hourly' | 'weekly' | 'custom';
+type ViewMode = "hourly" | "weekly" | "custom";
 
 export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('hourly');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>("hourly");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [zoomLevel, setZoomLevel] = useState(100); // 100% = default, up to 1000% for minute precision
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [hoveredSession, setHoveredSession] = useState<{
@@ -31,14 +31,14 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
     let end: Date;
 
     switch (viewMode) {
-      case 'hourly':
+      case "hourly":
         // Show only today's sessions
         start = new Date(now);
         start.setHours(0, 0, 0, 0);
         end = new Date(now);
         end.setHours(23, 59, 59, 999);
         break;
-      case 'weekly':
+      case "weekly":
         // Show last 7 days
         start = new Date(now);
         start.setDate(start.getDate() - 7);
@@ -46,7 +46,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
         end = new Date(now);
         end.setHours(23, 59, 59, 999);
         break;
-      case 'custom':
+      case "custom":
         // Show custom date range
         if (customStartDate && customEndDate) {
           start = new Date(customStartDate);
@@ -78,7 +78,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       (session) =>
         session.timestamp >= start.getTime() &&
         session.timestamp <= end.getTime() &&
-        session.state === "completed"
+        session.state === "completed",
     );
   }, [sessions, start, end]);
 
@@ -88,10 +88,10 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
 
     timelineFilteredSessions.forEach((session) => {
       const date = new Date(session.timestamp);
-      const dateKey = date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
+      const dateKey = date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
 
       if (!grouped.has(dateKey)) {
@@ -129,11 +129,11 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       if (session.state !== "completed") return;
 
       const date = new Date(session.timestamp);
-      const dateKey = date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
+      const dateKey = date.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
 
       if (!grouped.has(dateKey)) {
@@ -165,8 +165,8 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   };
 
   const formatTime = (date: Date) => {
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
     return `${hours}:${minutes}`;
   };
 
@@ -174,38 +174,56 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const getTimeScale = () => {
     if (zoomLevel >= 800) {
       // 800-1000%: Show every minute
-      return { unit: 'minute', count: 1440, label: (i: number) => {
-        const h = Math.floor(i / 60);
-        const m = i % 60;
-        if (m % 15 === 0) { // Show label every 15 minutes
-          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        }
-        return '';
-      }};
+      return {
+        unit: "minute",
+        count: 1440,
+        label: (i: number) => {
+          const h = Math.floor(i / 60);
+          const m = i % 60;
+          if (m % 15 === 0) {
+            // Show label every 15 minutes
+            return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+          }
+          return "";
+        },
+      };
     } else if (zoomLevel >= 400) {
       // 400-799%: Show every 5 minutes
-      return { unit: '5min', count: 288, label: (i: number) => {
-        const totalMinutes = i * 5;
-        const h = Math.floor(totalMinutes / 60);
-        const m = totalMinutes % 60;
-        if (m % 30 === 0) { // Show label every 30 minutes
-          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        }
-        return '';
-      }};
+      return {
+        unit: "5min",
+        count: 288,
+        label: (i: number) => {
+          const totalMinutes = i * 5;
+          const h = Math.floor(totalMinutes / 60);
+          const m = totalMinutes % 60;
+          if (m % 30 === 0) {
+            // Show label every 30 minutes
+            return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+          }
+          return "";
+        },
+      };
     } else if (zoomLevel >= 200) {
       // 200-399%: Show every 15 minutes
-      return { unit: '15min', count: 96, label: (i: number) => {
-        const totalMinutes = i * 15;
-        const h = Math.floor(totalMinutes / 60);
-        const m = totalMinutes % 60;
-        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-      }};
+      return {
+        unit: "15min",
+        count: 96,
+        label: (i: number) => {
+          const totalMinutes = i * 15;
+          const h = Math.floor(totalMinutes / 60);
+          const m = totalMinutes % 60;
+          return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+        },
+      };
     } else {
       // 100-199%: Show every hour
-      return { unit: 'hour', count: 24, label: (i: number) => {
-        return `${i.toString().padStart(2, '0')}:00`;
-      }};
+      return {
+        unit: "hour",
+        count: 24,
+        label: (i: number) => {
+          return `${i.toString().padStart(2, "0")}:00`;
+        },
+      };
     }
   };
 
@@ -224,7 +242,8 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
 
       // Center the scroll on the current time position
       const containerWidth = scrollContainerRef.current.clientWidth;
-      const scrollLeft = currentTimePosition + dateLabelWidth - (containerWidth / 2);
+      const scrollLeft =
+        currentTimePosition + dateLabelWidth - containerWidth / 2;
 
       scrollContainerRef.current.scrollLeft = Math.max(0, scrollLeft);
     }
@@ -285,21 +304,30 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">End:</span>
                 <span className="font-medium">
-                  {formatTime(new Date(hoveredSession.session.timestamp + hoveredSession.session.duration))}
+                  {formatTime(
+                    new Date(
+                      hoveredSession.session.timestamp +
+                        hoveredSession.session.duration,
+                    ),
+                  )}
                 </span>
               </div>
               {hoveredSession.session.rating > 0 && (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Rating:</span>
                   <div className="flex items-center gap-1">
-                    <span className="font-medium">{hoveredSession.session.rating}</span>
+                    <span className="font-medium">
+                      {hoveredSession.session.rating}
+                    </span>
                     <span className="text-yellow-400">★</span>
                   </div>
                 </div>
               )}
               {hoveredSession.session.comment && (
                 <div className="pt-2 border-t">
-                  <span className="text-muted-foreground block mb-1">Comment:</span>
+                  <span className="text-muted-foreground block mb-1">
+                    Comment:
+                  </span>
                   <p className="text-sm">{hoveredSession.session.comment}</p>
                 </div>
               )}
@@ -330,7 +358,9 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-sm">Timeline View</CardTitle>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">Zoom: {zoomLevel}%</span>
+                <span className="text-xs text-muted-foreground">
+                  Zoom: {zoomLevel}%
+                </span>
                 <input
                   type="range"
                   min="100"
@@ -343,12 +373,21 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
               </div>
             </CardHeader>
             <CardContent>
-              <div ref={scrollContainerRef} className="relative min-h-[200px] overflow-x-auto overflow-y-hidden">
+              <div
+                ref={scrollContainerRef}
+                className="relative min-h-[200px] overflow-x-auto overflow-y-hidden"
+              >
                 <div className="relative" style={{ width: `${totalWidth}px` }}>
                   {/* Time grid */}
                   <div className="flex border-b border-gray-200 pb-2 mb-4 sticky top-0 bg-background z-10">
-                    <div className="flex-shrink-0" style={{ width: `${dateLabelWidth}px` }}></div>
-                    <div className="flex" style={{ width: `${timelineWidth}px` }}>
+                    <div
+                      className="flex-shrink-0"
+                      style={{ width: `${dateLabelWidth}px` }}
+                    ></div>
+                    <div
+                      className="flex"
+                      style={{ width: `${timelineWidth}px` }}
+                    >
                       {Array.from({ length: timeScale.count }, (_, i) => {
                         const label = timeScale.label(i);
                         const cellWidth = timelineWidth / timeScale.count;
@@ -370,20 +409,36 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                     {ganttData.map((dayData) => (
                       <div key={dayData.dateKey} className="flex">
                         {/* Date label */}
-                        <div className="flex-shrink-0 text-xs font-medium text-muted-foreground flex items-start pt-1 sticky left-0 bg-background" style={{ width: `${dateLabelWidth}px` }}>
+                        <div
+                          className="flex-shrink-0 text-xs font-medium text-muted-foreground flex items-start pt-1 sticky left-0 bg-background"
+                          style={{ width: `${dateLabelWidth}px` }}
+                        >
                           {dayData.dateKey}
                         </div>
 
                         {/* Timeline for this day */}
-                        <div className="relative" style={{ width: `${timelineWidth}px`, height: `${dayData.sessions.length * 32}px`, minHeight: '32px' }}>
+                        <div
+                          className="relative"
+                          style={{
+                            width: `${timelineWidth}px`,
+                            height: `${dayData.sessions.length * 32}px`,
+                            minHeight: "32px",
+                          }}
+                        >
                           {dayData.sessions.map((item, idx) => {
-                            const startMinutes = item.start.getHours() * 60 + item.start.getMinutes();
+                            const startMinutes =
+                              item.start.getHours() * 60 +
+                              item.start.getMinutes();
                             const durationMinutes = item.duration / (1000 * 60);
-                            const leftPx = (startMinutes / 1440) * timelineWidth;
-                            const widthPx = (durationMinutes / 1440) * timelineWidth;
+                            const leftPx =
+                              (startMinutes / 1440) * timelineWidth;
+                            const widthPx =
+                              (durationMinutes / 1440) * timelineWidth;
 
                             // Find the original session object for this item
-                            const originalSession = sessions.find(s => s.id === item.id)!;
+                            const originalSession = sessions.find(
+                              (s) => s.id === item.id,
+                            )!;
 
                             return (
                               <div
@@ -394,8 +449,12 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                                   width: `${widthPx}px`,
                                   top: `${idx * 32}px`,
                                 }}
-                                onMouseEnter={(e) => handleSessionHover(originalSession, e)}
-                                onMouseMove={(e) => handleMouseMove(originalSession, e)}
+                                onMouseEnter={(e) =>
+                                  handleSessionHover(originalSession, e)
+                                }
+                                onMouseMove={(e) =>
+                                  handleMouseMove(originalSession, e)
+                                }
                                 onMouseLeave={handleSessionLeave}
                               >
                                 <span className="text-xs text-primary-foreground truncate">
@@ -419,31 +478,33 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant={viewMode === 'hourly' ? 'default' : 'outline'}
-                onClick={() => setViewMode('hourly')}
+                variant={viewMode === "hourly" ? "default" : "outline"}
+                onClick={() => setViewMode("hourly")}
               >
                 Hourly
               </Button>
               <Button
                 size="sm"
-                variant={viewMode === 'weekly' ? 'default' : 'outline'}
-                onClick={() => setViewMode('weekly')}
+                variant={viewMode === "weekly" ? "default" : "outline"}
+                onClick={() => setViewMode("weekly")}
               >
                 Weekly
               </Button>
               <Button
                 size="sm"
-                variant={viewMode === 'custom' ? 'default' : 'outline'}
-                onClick={() => setViewMode('custom')}
+                variant={viewMode === "custom" ? "default" : "outline"}
+                onClick={() => setViewMode("custom")}
               >
                 Custom
               </Button>
             </div>
 
-            {viewMode === 'custom' && (
+            {viewMode === "custom" && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="start-date" className="text-xs">Start Date</Label>
+                  <Label htmlFor="start-date" className="text-xs">
+                    Start Date
+                  </Label>
                   <Input
                     id="start-date"
                     type="date"
@@ -452,7 +513,9 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="end-date" className="text-xs">End Date</Label>
+                  <Label htmlFor="end-date" className="text-xs">
+                    End Date
+                  </Label>
                   <Input
                     id="end-date"
                     type="date"
@@ -479,14 +542,18 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       {sessionsByDay.length > 0 ? (
         <div className="px-6 space-y-4">
           {sessionsByDay.map(([dateKey, daySessions]) => {
-            const totalDuration = daySessions.reduce((sum, s) => sum + s.duration, 0);
+            const totalDuration = daySessions.reduce(
+              (sum, s) => sum + s.duration,
+              0,
+            );
             return (
               <Card key={dateKey}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{dateKey}</CardTitle>
                     <div className="text-sm text-muted-foreground">
-                      {formatDuration(totalDuration)} • {daySessions.length} sessions
+                      {formatDuration(totalDuration)} • {daySessions.length}{" "}
+                      sessions
                     </div>
                   </div>
                 </CardHeader>
@@ -501,7 +568,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                           <div className="truncate">{session.title}</div>
                           <div className="text-sm text-muted-foreground mt-1">
                             {formatTime(new Date(session.timestamp))}
-                            {' • '}
+                            {" • "}
                             {formatDuration(session.duration)}
                           </div>
                           {session.comment && (
