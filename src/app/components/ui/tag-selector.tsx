@@ -146,14 +146,14 @@ export function TagSelector({ value, onChange, disabled }: TagSelectorProps) {
             </div>
           ) : (
             <div className="flex items-center">
-              <div className="text-sm text-muted-foreground border-b-2 border-foreground pb-0.5 min-w-[100px]">
-                Tags
+              <div className="text-sm text-muted-foreground border-b-2 border-foreground pb-0.5 min-w-[100px] text-center">
+                Select a tag
               </div>
             </div>
           )}
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-[250px] p-0" align="start">
+      <PopoverContent className="w-[250px] p-0" align="center">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Search or create tag..."
@@ -191,7 +191,8 @@ export function TagSelector({ value, onChange, disabled }: TagSelectorProps) {
                   className="cursor-pointer"
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Create new tag: <strong className="ml-1">{searchQuery}</strong>
+                  Create new tag:{" "}
+                  <strong className="ml-1">{searchQuery}</strong>
                 </CommandItem>
               )}
             </CommandGroup>

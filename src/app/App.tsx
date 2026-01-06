@@ -15,10 +15,7 @@ import {
   getActiveSession,
   getSessionsByState,
 } from "../lib/db/appSessionUtil";
-import {
-  incrementTagInstances,
-  updateTagLastUsed,
-} from "../lib/db/appTagUtil";
+import { incrementTagInstances, updateTagLastUsed } from "../lib/db/appTagUtil";
 import { DEFAULT_STOPGAP } from "../lib/constants";
 import { saveConfig, getConfig, getAllConfig } from "../lib/db/appConfigUtil";
 import { exportSessionsToCSV } from "../lib/csvExportUtil";

@@ -230,9 +230,9 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
 
       const date = new Date(session.timestamp);
       const dateKey = date.toLocaleDateString("en-US", {
-        weekday: "long",
+        weekday: "short",
         year: "numeric",
-        month: "long",
+        month: "short",
         day: "numeric",
       });
 
@@ -478,9 +478,7 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
         <div className="px-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">
-                Session Duration by Tag
-              </CardTitle>
+              <CardTitle className="text-sm">Session Duration by Tag</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -496,9 +494,10 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                           (sum, d) => sum + d.value,
                           0,
                         );
-                        const percentage = ((value / totalDuration) * 100).toFixed(
-                          1,
-                        );
+                        const percentage = (
+                          (value / totalDuration) *
+                          100
+                        ).toFixed(1);
                         return `${name}: ${formatPieChartDuration(value)} (${percentage}%)`;
                       }}
                       outerRadius={80}
@@ -511,7 +510,8 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                     </Pie>
                     <Legend
                       verticalAlign="bottom"
-                      height={36}
+                      align="center"
+                      layout="vertical"
                       formatter={(value, entry: any) =>
                         `${value} (${formatPieChartDuration(entry.payload.value)})`
                       }

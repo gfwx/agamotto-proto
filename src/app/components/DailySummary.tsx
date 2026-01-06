@@ -8,8 +8,11 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  PieChart,
+  Pie,
+  Legend,
 } from "recharts";
-import { Clock } from "lucide-react";
+import { Clock, Moon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tag } from "./ui/tag";
 import type { Session } from "../../lib/db/appSessionUtil";
@@ -23,17 +26,31 @@ export function DailySummary({ sessions }: DailySummaryProps) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = today.getTime();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowTimestamp = tomorrow.getTime();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayTimestamp = yesterday.getTime();
 
     const todaySessions = sessions.filter(
       (session) =>
         session.timestamp >= todayTimestamp && session.state === "completed",
     );
 
-    // Group by hour
+    // Find last completed sleep session (most recent)
+    const lastSleepSession = sessions.find(
+      (session) =>
+        session.state === "completed" &&
+        session.tag?.name.toLowerCase() === "sleep",
+    );
+
+    // Group by hour with tag color tracking
     const hourlyData = new Array(24).fill(0).map((_, hour) => ({
       hour,
       duration: 0,
       sessions: [] as Session[],
+      tagColors: new Map<string, number>(), // Map of color to duration
     }));
 
     todaySessions.forEach((session) => {
@@ -41,7 +58,76 @@ export function DailySummary({ sessions }: DailySummaryProps) {
       const hour = sessionDate.getHours();
       hourlyData[hour].duration += session.duration;
       hourlyData[hour].sessions.push(session);
+
+      // Track tag colors and their durations
+      const color = session.tag?.color || "#9CA3AF"; // Gray for untagged
+      const currentDuration = hourlyData[hour].tagColors.get(color) || 0;
+      hourlyData[hour].tagColors.set(color, currentDuration + session.duration);
     });
+
+    // Sessions created today or carried over from yesterday
+    const todayOrCarriedOverSessions = sessions.filter((session) => {
+      if (session.state !== "completed") return false;
+
+      const sessionStart = session.timestamp;
+      const sessionEnd = session.timestamp + session.duration;
+
+      // Created today
+      if (sessionStart >= todayTimestamp && sessionStart < tomorrowTimestamp) {
+        return true;
+      }
+
+      // Started yesterday but ended today (carried over)
+      if (
+        sessionStart >= yesterdayTimestamp &&
+        sessionStart < todayTimestamp &&
+        sessionEnd >= todayTimestamp
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    // Calculate tag duration distribution for pie chart
+    const tagDurations = new Map<string, { duration: number; color: string }>();
+    let untaggedDuration = 0;
+
+    todayOrCarriedOverSessions.forEach((session) => {
+      if (session.tag) {
+        const existing = tagDurations.get(session.tag.name) || {
+          duration: 0,
+          color: session.tag.color,
+        };
+        tagDurations.set(session.tag.name, {
+          duration: existing.duration + session.duration,
+          color: session.tag.color,
+        });
+      } else {
+        untaggedDuration += session.duration;
+      }
+    });
+
+    // Convert to array for recharts
+    const pieChartData = Array.from(tagDurations.entries()).map(
+      ([name, data]) => ({
+        name,
+        value: data.duration,
+        color: data.color,
+      }),
+    );
+
+    // Add untagged sessions if any
+    if (untaggedDuration > 0) {
+      pieChartData.push({
+        name: "Untagged",
+        value: untaggedDuration,
+        color: "#9CA3AF",
+      });
+    }
+
+    // Sort by duration descending
+    pieChartData.sort((a, b) => b.value - a.value);
 
     return {
       todaySessions,
@@ -52,6 +138,8 @@ export function DailySummary({ sessions }: DailySummaryProps) {
           ? todaySessions.reduce((sum, s) => sum + s.rating, 0) /
             todaySessions.length
           : 0,
+      lastSleepSession,
+      pieChartData,
     };
   }, [sessions]);
 
@@ -77,11 +165,38 @@ export function DailySummary({ sessions }: DailySummaryProps) {
     return `${hour - 12}pm`;
   };
 
-  const getBarColor = (hour: number) => {
-    if (hour < 6) return "hsl(var(--muted))";
-    if (hour < 12) return "hsl(var(--primary))";
-    if (hour < 18) return "hsl(var(--primary))";
-    return "hsl(var(--muted-foreground))";
+  const formatPieChartDuration = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const parts = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+
+    return parts.join(" ");
+  };
+
+  const getBarColor = (hourData: {
+    hour: number;
+    duration: number;
+    sessions: Session[];
+    tagColors: Map<string, number>;
+  }) => {
+    // Find the tag with the longest duration for this hour
+    let maxDuration = 0;
+    let dominantColor = "#9CA3AF"; // Default gray for untagged
+
+    hourData.tagColors.forEach((duration, color) => {
+      if (duration > maxDuration) {
+        maxDuration = duration;
+        dominantColor = color;
+      }
+    });
+
+    return dominantColor;
   };
 
   return (
@@ -119,6 +234,37 @@ export function DailySummary({ sessions }: DailySummaryProps) {
         </Card>
       </div>
 
+      {todayData.lastSleepSession && (
+        <div className="px-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">
+                Last Sleep Session
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <Moon className="h-5 w-5 text-muted-foreground" />
+                <span className="text-2xl">
+                  {formatDuration(todayData.lastSleepSession.duration)}
+                </span>
+              </div>
+              <div className="text-sm text-muted-foreground mt-2">
+                {new Date(todayData.lastSleepSession.timestamp).toLocaleString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  },
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {todayData.hourlyData.length > 0 ? (
         <div className="px-6">
           <Card>
@@ -144,10 +290,7 @@ export function DailySummary({ sessions }: DailySummaryProps) {
                   />
                   <Bar dataKey="duration" radius={[4, 4, 0, 0]}>
                     {todayData.hourlyData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={getBarColor(entry.hour)}
-                      />
+                      <Cell key={`cell-${index}`} fill={getBarColor(entry)} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -160,6 +303,55 @@ export function DailySummary({ sessions }: DailySummaryProps) {
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               No sessions recorded today yet
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {todayData.pieChartData.length > 0 && (
+        <div className="px-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">
+                Today's Sessions by Tag
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={todayData.pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => {
+                      const totalDuration = todayData.pieChartData.reduce(
+                        (sum, d) => sum + d.value,
+                        0,
+                      );
+                      const percentage = ((value / totalDuration) * 100).toFixed(
+                        1,
+                      );
+                      return `${name}: ${formatPieChartDuration(value)} (${percentage}%)`;
+                    }}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {todayData.pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    layout="vertical"
+                    formatter={(value, entry: any) =>
+                      `${value} (${formatPieChartDuration(entry.payload.value)})`
+                    }
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>

@@ -209,8 +209,12 @@ export function Stopwatch({
         )}
 
         {/* Tag Selector */}
-        <div className="mt-6 w-full max-w-xs">
-          <TagSelector value={currentTag} onChange={onTagChange} disabled={false} />
+        <div className="mt-6 w-full flex justify-center">
+          <TagSelector
+            value={currentTag}
+            onChange={onTagChange}
+            disabled={false}
+          />
         </div>
       </div>
 

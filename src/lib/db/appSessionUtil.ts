@@ -132,7 +132,7 @@ export async function getActiveSession(): Promise<Session | null> {
 }
 
 /**
- * Get all sessions with a specific state
+ * Get all sessions with a specific state, ordered by timestamp descending (newest first)
  */
 export async function getSessionsByState(state: string): Promise<Session[]> {
   const db = await initDatabase();
@@ -140,11 +140,26 @@ export async function getSessionsByState(state: string): Promise<Session[]> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(SESSIONS_STORE, "readonly");
     const store = transaction.objectStore(SESSIONS_STORE);
-    const index = store.index("by_state");
-    const request = index.getAll(IDBKeyRange.only(state));
+    const index = store.index("by_state_and_timestamp");
+    const sessions: Session[] = [];
+
+    // Use cursor with 'prev' direction to get sessions in descending timestamp order
+    // The key range covers [state, timestamp] pairs, so we bound by state only
+    const range = IDBKeyRange.bound(
+      [state, 0],
+      [state, Number.MAX_SAFE_INTEGER],
+    );
+    const request = index.openCursor(range, "prev");
 
     request.onsuccess = () => {
-      resolve(request.result);
+      const cursor = request.result;
+      if (cursor) {
+        sessions.push(cursor.value);
+        cursor.continue();
+      } else {
+        // All sessions retrieved
+        resolve(sessions);
+      }
     };
 
     request.onerror = () => {
@@ -154,7 +169,7 @@ export async function getSessionsByState(state: string): Promise<Session[]> {
 }
 
 /**
- * Get all sessions
+ * Get all sessions, ordered by timestamp descending (newest first)
  */
 export async function getAllSessions(): Promise<Session[]> {
   const db = await initDatabase();
@@ -162,10 +177,21 @@ export async function getAllSessions(): Promise<Session[]> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(SESSIONS_STORE, "readonly");
     const store = transaction.objectStore(SESSIONS_STORE);
-    const request = store.getAll();
+    const index = store.index("by_timestamp");
+    const sessions: Session[] = [];
+
+    // Use cursor with 'prev' direction to get sessions in descending timestamp order
+    const request = index.openCursor(null, "prev");
 
     request.onsuccess = () => {
-      resolve(request.result);
+      const cursor = request.result;
+      if (cursor) {
+        sessions.push(cursor.value);
+        cursor.continue();
+      } else {
+        // All sessions retrieved
+        resolve(sessions);
+      }
     };
 
     request.onerror = () => {
