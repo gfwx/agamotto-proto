@@ -265,6 +265,51 @@ export function DailySummary({ sessions }: DailySummaryProps) {
         </div>
       )}
 
+      {todayData.pieChartData.length > 0 && (
+        <div className="px-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Today's Sessions by Tag</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" aspect={1}>
+                <PieChart>
+                  <Pie
+                    data={todayData.pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    isAnimationActive={false}
+                  >
+                    {todayData.pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    layout="vertical"
+                    formatter={(value, entry: any) => {
+                      const totalDuration = todayData.pieChartData.reduce(
+                        (sum, d) => sum + d.value,
+                        0,
+                      );
+                      const percentage = (
+                        (entry.payload.value / totalDuration) *
+                        100
+                      ).toFixed(1);
+                      return `${value} (${formatPieChartDuration(entry.payload.value)} | ${percentage}%)`;
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       {todayData.hourlyData.length > 0 ? (
         <div className="px-6">
           <Card>
@@ -307,56 +352,6 @@ export function DailySummary({ sessions }: DailySummaryProps) {
           </Card>
         </div>
       )}
-
-      {todayData.pieChartData.length > 0 && (
-        <div className="px-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">
-                Today's Sessions by Tag
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={todayData.pieChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => {
-                      const totalDuration = todayData.pieChartData.reduce(
-                        (sum, d) => sum + d.value,
-                        0,
-                      );
-                      const percentage = ((value / totalDuration) * 100).toFixed(
-                        1,
-                      );
-                      return `${name}: ${formatPieChartDuration(value)} (${percentage}%)`;
-                    }}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {todayData.pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Legend
-                    verticalAlign="bottom"
-                    align="center"
-                    layout="vertical"
-                    formatter={(value, entry: any) =>
-                      `${value} (${formatPieChartDuration(entry.payload.value)})`
-                    }
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {todayData.todaySessions.length > 0 && (
         <div className="px-6 space-y-3">
           <h3 className="font-medium">Recent Sessions</h3>

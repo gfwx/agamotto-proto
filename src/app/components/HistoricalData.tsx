@@ -482,27 +482,17 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" aspect={1}>
                   <PieChart>
                     <Pie
                       data={tagDurationData}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      label={({ name, value }) => {
-                        const totalDuration = tagDurationData.reduce(
-                          (sum, d) => sum + d.value,
-                          0,
-                        );
-                        const percentage = (
-                          (value / totalDuration) *
-                          100
-                        ).toFixed(1);
-                        return `${name}: ${formatPieChartDuration(value)} (${percentage}%)`;
-                      }}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
+                      labelLine={false}
+                      isAnimationActive={false}
                     >
                       {tagDurationData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -512,9 +502,17 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
                       verticalAlign="bottom"
                       align="center"
                       layout="vertical"
-                      formatter={(value, entry: any) =>
-                        `${value} (${formatPieChartDuration(entry.payload.value)})`
-                      }
+                      formatter={(value, entry: any) => {
+                        const totalDuration = tagDurationData.reduce(
+                          (sum, d) => sum + d.value,
+                          0,
+                        );
+                        const percentage = (
+                          (entry.payload.value / totalDuration) *
+                          100
+                        ).toFixed(1);
+                        return `${value} (${formatPieChartDuration(entry.payload.value)} | ${percentage}%)`;
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
