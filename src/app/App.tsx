@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Timer, ChartBar, History } from "lucide-react";
+import { Timer, ChartBar, History, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Stopwatch } from "./components/Stopwatch";
 import { SessionDialog } from "./components/SessionDialog";
 import { DailySummary } from "./components/DailySummary";
 import { HistoricalData } from "./components/HistoricalData";
+import AdvancedStatistics from "./components/AdvancedStatistics";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/sonner";
 import type { Session } from "../lib/db/appSessionUtil";
@@ -25,7 +26,7 @@ function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [currentView, setCurrentView] = useState<
-    "timer" | "today" | "historical"
+    "timer" | "today" | "historical" | "advanced"
   >("timer");
   const [showDialog, setShowDialog] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
@@ -433,6 +434,17 @@ function App() {
     }
   };
 
+  const handleImportCSV = async () => {
+    try {
+      // Reload completed sessions after import
+      const completedSessions = await getSessionsByState("completed");
+      setSessions(completedSessions);
+    } catch (error) {
+      console.error("Failed to refresh sessions:", error);
+      toast.error("Failed to refresh session list");
+    }
+  };
+
   return (
     <>
       <Toaster />
@@ -465,6 +477,15 @@ function App() {
             >
               <ChartBar className="h-4 w-4" />
               Today's Insights
+            </Button>
+            <Button
+              variant={currentView === "advanced" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("advanced")}
+              className="gap-2"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Advanced Stats
             </Button>
             <Button
               variant={currentView === "historical" ? "default" : "ghost"}
@@ -506,6 +527,19 @@ function App() {
               </span>
             </Button>
             <Button
+              variant={currentView === "advanced" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("advanced")}
+              className="flex-col py-2 px-2 gap-1 w-18 h-18"
+            >
+              <TrendingUp className="h-9 w-9" />
+              <span className="text-xs">
+                Advanced
+                <br />
+                Stats
+              </span>
+            </Button>
+            <Button
               variant={currentView === "historical" ? "default" : "ghost"}
               size="sm"
               onClick={() => setCurrentView("historical")}
@@ -542,9 +576,17 @@ function App() {
             <div className="py-6">
               <DailySummary sessions={sessions} />
             </div>
+          ) : currentView === "advanced" ? (
+            <div className="py-6">
+              <AdvancedStatistics sessions={sessions} />
+            </div>
           ) : (
             <div className="py-6">
-              <HistoricalData sessions={sessions} onExport={handleExportCSV} />
+              <HistoricalData
+                sessions={sessions}
+                onExport={handleExportCSV}
+                onImport={handleImportCSV}
+              />
             </div>
           )}
         </main>

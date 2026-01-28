@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Download, Calendar } from "lucide-react";
+import { Download, Calendar, Upload, AlertCircle, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Tag } from "./ui/tag";
@@ -7,15 +8,21 @@ import type { Session } from "../../lib/db/appSessionUtil";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
+import {
+  readFileContent,
+  validateCSV,
+  importSessionsFromCSV,
+} from "../../lib/csvImportUtil";
 
 interface HistoricalDataProps {
   sessions: Session[];
   onExport: () => void;
+  onImport: () => Promise<void>;
 }
 
 type ViewMode = "hourly" | "weekly" | "custom";
 
-export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
+export function HistoricalData({ sessions, onExport, onImport }: HistoricalDataProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("hourly");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
@@ -24,6 +31,8 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
   const [pieChartCustomEndDate, setPieChartCustomEndDate] = useState("");
   const [zoomLevel, setZoomLevel] = useState(100); // 100% = default, up to 1000% for minute precision
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [hoveredSession, setHoveredSession] = useState<{
     session: Session;
     x: number;
@@ -385,6 +394,131 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset file input so the same file can be selected again
+    event.target.value = "";
+
+    // Check file type
+    if (!file.name.endsWith(".csv")) {
+      toast.error("Invalid file type", {
+        description: "Please select a CSV file",
+        icon: <AlertCircle className="h-4 w-4" />,
+      });
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      // Read file content
+      const content = await readFileContent(file);
+
+      // Validate CSV
+      const validation = validateCSV(content);
+
+      if (!validation.isValid) {
+        // Show validation errors
+        toast.error("CSV validation failed", {
+          description: (
+            <div className="space-y-1">
+              {validation.errors.slice(0, 3).map((error, index) => (
+                <div key={index} className="text-xs">
+                  • {error}
+                </div>
+              ))}
+              {validation.errors.length > 3 && (
+                <div className="text-xs text-muted-foreground">
+                  ...and {validation.errors.length - 3} more errors
+                </div>
+              )}
+            </div>
+          ),
+          icon: <AlertCircle className="h-4 w-4" />,
+          duration: 8000,
+        });
+        setIsImporting(false);
+        return;
+      }
+
+      // Show warnings if any
+      if (validation.warnings.length > 0) {
+        toast.warning("Import warnings", {
+          description: (
+            <div className="space-y-1">
+              {validation.warnings.slice(0, 3).map((warning, index) => (
+                <div key={index} className="text-xs">
+                  • {warning}
+                </div>
+              ))}
+              {validation.warnings.length > 3 && (
+                <div className="text-xs text-muted-foreground">
+                  ...and {validation.warnings.length - 3} more warnings
+                </div>
+              )}
+            </div>
+          ),
+          duration: 6000,
+        });
+      }
+
+      // Import sessions
+      const result = await importSessionsFromCSV(content);
+
+      if (result.failedRows.length > 0) {
+        // Partial success
+        toast.warning("Import completed with errors", {
+          description: (
+            <div className="space-y-1">
+              <div className="text-sm">
+                {result.successCount} sessions imported successfully
+              </div>
+              <div className="text-sm">
+                {result.failedCount} sessions failed to import
+              </div>
+              {result.failedRows.slice(0, 2).map((failure, index) => (
+                <div key={index} className="text-xs text-muted-foreground">
+                  Row {failure.rowNumber}: {failure.error}
+                </div>
+              ))}
+              {result.failedRows.length > 2 && (
+                <div className="text-xs text-muted-foreground">
+                  ...and {result.failedRows.length - 2} more failures
+                </div>
+              )}
+            </div>
+          ),
+          duration: 8000,
+        });
+      } else {
+        // Complete success
+        toast.success("Import successful", {
+          description: `${result.successCount} sessions imported successfully`,
+          icon: <CheckCircle className="h-4 w-4" />,
+        });
+      }
+
+      // Refresh sessions list
+      await onImport();
+    } catch (error) {
+      toast.error("Import failed", {
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred",
+        icon: <AlertCircle className="h-4 w-4" />,
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-6 relative">
       {/* Floating Session Details Dialog */}
@@ -461,16 +595,35 @@ export function HistoricalData({ sessions, onExport }: HistoricalDataProps) {
       <div className="px-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl">Historical Data</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onExport}
-            disabled={sessions.length === 0}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImportClick}
+              disabled={isImporting}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {isImporting ? "Importing..." : "Import CSV"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExport}
+              disabled={sessions.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          onChange={handleFileChange}
+          className="hidden"
+        />
       </div>
 
       {/* Tag Duration Pie Chart */}

@@ -1,0 +1,5 @@
+Date,Time,Title,Duration (seconds),Rating,Comment,Tag,State
+27/01/2026,09:00:00,Valid completed session,3600,4,This is fine,routine,completed
+27/01/2026,14:30:00,INVALID - Active session,1800,3,This should be rejected,work,active
+27/01/2026,18:00:00,INVALID - Paused session,2400,4,This should also be rejected,sleep,paused
+27/01/2026,20:00:00,Another valid session,3000,5,This is fine,routine,completed

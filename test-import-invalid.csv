@@ -1,0 +1,6 @@
+Date,Time,Title,Duration (seconds),Rating,Comment,Tag,State
+27/01/2026,09:00:00,Valid session,3600,4,This is valid,routine,completed
+27/01/2026,14:30:00,Missing duration,,5,This will fail,,completed
+27/01/2026,18:00:00,Invalid rating,1800,10,Rating out of range,work,completed
+27/01/2026,20:00:00,Invalid state,2400,3,Bad state value,sleep,invalid_state
+,22:00:00,Missing date,1200,4,No date provided,work,completed

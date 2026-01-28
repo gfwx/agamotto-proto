@@ -1,0 +1,5 @@
+Date,Time,Title,Duration (seconds),Rating,Comment,Tag,State
+01/01/2026,09:00:00,New Year's Day,3600,5,Starting the year right,routine,completed
+15/03/2026,14:30:00,Mid-month session,5400,4,Good progress,work,completed
+31/12/2025,23:45:00,New Year's Eve,1800,5,Last session of the year,sleep,completed
+29/02/2024,12:00:00,Leap day session,7200,3,Rare day,work,completed
