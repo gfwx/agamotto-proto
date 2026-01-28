@@ -477,6 +477,7 @@ export function HistoricalData({ sessions, onExport, onImport }: HistoricalDataP
       const hasFailures = result.failedCount > 0;
       const hasDuplicates = result.duplicatesSkipped > 0;
       const hasSuccess = result.successCount > 0;
+      const hasTagsCreated = result.tagsCreated > 0;
 
       if (hasFailures || hasDuplicates) {
         // Partial success or issues
@@ -491,6 +492,11 @@ export function HistoricalData({ sessions, onExport, onImport }: HistoricalDataP
               {hasSuccess && (
                 <div className="text-sm font-medium">
                   {result.successCount} sessions imported successfully
+                </div>
+              )}
+              {hasTagsCreated && (
+                <div className="text-sm text-green-400">
+                  {result.tagsCreated} new tag(s) created: {result.tagsCreatedList.join(", ")}
                 </div>
               )}
               {hasFailures && (
@@ -529,8 +535,12 @@ export function HistoricalData({ sessions, onExport, onImport }: HistoricalDataP
         });
       } else {
         // Complete success
+        const successMessage = hasTagsCreated
+          ? `${result.successCount} sessions imported successfully. Created ${result.tagsCreated} new tag(s): ${result.tagsCreatedList.join(", ")}`
+          : `${result.successCount} sessions imported successfully`;
+
         toast.success("Import successful", {
-          description: `${result.successCount} sessions imported successfully`,
+          description: successMessage,
           icon: <CheckCircle className="h-4 w-4" />,
         });
       }

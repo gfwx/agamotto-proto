@@ -1,6 +1,7 @@
 import type { Session } from "./db/appSessionUtil";
 import { saveSession, getAllSessions } from "./db/appSessionUtil";
-import { getTag } from "./db/appTagUtil";
+import { getTag, saveTag, getAvailableColors, getAllTags } from "./db/appTagUtil";
+import type { Tag } from "./db/appTagUtil";
 
 /**
  * Result of CSV import validation
@@ -21,6 +22,8 @@ export interface ImportResult extends ImportValidationResult {
   failedRows: Array<{ rowNumber: number; error: string }>;
   duplicatesSkipped: number;
   duplicateRows: Array<{ rowNumber: number; timestamp: number; title: string }>;
+  tagsCreated: number;
+  tagsCreatedList: string[];
 }
 
 /**
@@ -58,6 +61,77 @@ const VALID_STATES = ["active", "completed", "aborted", "paused", "not_started"]
  * Note: "active" and "paused" are NOT allowed because only one active/paused session can exist at a time
  */
 const IMPORTABLE_STATES = ["completed", "aborted", "not_started"];
+
+/**
+ * Extract unique tag names from CSV data rows
+ */
+function extractUniqueTags(dataRows: string[][]): string[] {
+  const tagNames = new Set<string>();
+
+  dataRows.forEach((row) => {
+    // Tag is the 7th column (index 6)
+    const tagName = row[6]?.trim();
+    if (tagName && tagName.length > 0) {
+      tagNames.add(tagName);
+    }
+  });
+
+  return Array.from(tagNames);
+}
+
+/**
+ * Create missing tags with available colors
+ * Returns map of tag name to Tag object (for both existing and newly created tags)
+ */
+async function createMissingTags(
+  tagNames: string[],
+): Promise<{ createdTagNames: string[]; tagMap: Map<string, Tag> }> {
+  const createdTagNames: string[] = [];
+  const tagMap = new Map<string, Tag>();
+
+  // Get available colors
+  let availableColors = await getAvailableColors();
+
+  for (const tagName of tagNames) {
+    // Check if tag already exists
+    const existingTag = await getTag(tagName);
+
+    if (existingTag) {
+      // Tag exists, add to map
+      tagMap.set(tagName, existingTag);
+    } else {
+      // Tag doesn't exist, need to create it
+      if (availableColors.length === 0) {
+        throw new Error(
+          `Cannot create tag "${tagName}": Maximum number of tags (24) reached. No available colors.`,
+        );
+      }
+
+      // Get next available color
+      const color = availableColors[0];
+
+      // Create new tag
+      const newTag: Tag = {
+        name: tagName,
+        color,
+        dateCreated: Date.now(),
+        dateLastUsed: Date.now(),
+        totalInstances: 0,
+      };
+
+      await saveTag(newTag);
+
+      // Add to results
+      createdTagNames.push(tagName);
+      tagMap.set(tagName, newTag);
+
+      // Remove used color from available list
+      availableColors = availableColors.slice(1);
+    }
+  }
+
+  return { createdTagNames, tagMap };
+}
 
 /**
  * Parse date in DD/MM/YYYY format to timestamp
@@ -310,6 +384,45 @@ export async function importSessionsFromCSV(
       failedRows: [],
       duplicatesSkipped: 0,
       duplicateRows: [],
+      tagsCreated: 0,
+      tagsCreatedList: [],
+    };
+  }
+
+  const rows = parseCSV(content);
+  const dataRows = rows.slice(1); // Skip header
+
+  const additionalWarnings: string[] = [...validation.warnings];
+
+  // Extract unique tags from CSV and create any that don't exist
+  const uniqueTags = extractUniqueTags(dataRows);
+  let createdTags: string[] = [];
+  let tagMap: Map<string, Tag> = new Map();
+
+  try {
+    const tagResult = await createMissingTags(uniqueTags);
+    createdTags = tagResult.createdTagNames;
+    tagMap = tagResult.tagMap;
+
+    if (createdTags.length > 0) {
+      additionalWarnings.push(
+        `Created ${createdTags.length} new tag(s): ${createdTags.join(", ")}`,
+      );
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    return {
+      isValid: false,
+      errors: [errorMsg],
+      warnings: additionalWarnings,
+      sessionCount: 0,
+      successCount: 0,
+      failedCount: 0,
+      failedRows: [],
+      duplicatesSkipped: 0,
+      duplicateRows: [],
+      tagsCreated: 0,
+      tagsCreatedList: [],
     };
   }
 
@@ -320,13 +433,9 @@ export async function importSessionsFromCSV(
     existingSessions.map((session) => session.timestamp),
   );
 
-  const rows = parseCSV(content);
-  const dataRows = rows.slice(1); // Skip header
-
   let successCount = 0;
   const failedRows: Array<{ rowNumber: number; error: string }> = [];
   const duplicateRows: Array<{ rowNumber: number; timestamp: number; title: string }> = [];
-  const additionalWarnings: string[] = [...validation.warnings];
 
   // Import each session
   for (let i = 0; i < dataRows.length; i++) {
@@ -359,14 +468,22 @@ export async function importSessionsFromCSV(
         continue; // Skip this row, don't import duplicate
       }
 
-      // Get tag if specified
+      // Get tag if specified (use cached tagMap to avoid DB queries)
       let tag = null;
       if (tagName && tagName.trim().length > 0) {
-        tag = await getTag(tagName.trim());
+        const trimmedTagName = tagName.trim();
+        // First check the tagMap (contains both existing and newly created tags)
+        tag = tagMap.get(trimmedTagName) || null;
+
+        // If not in map, tag must not have been in the CSV's unique tags
+        // (This shouldn't happen, but handle it gracefully)
         if (!tag) {
-          additionalWarnings.push(
-            `Row ${rowNumber}: Tag "${tagName}" not found. Session will be imported without tag.`,
-          );
+          tag = await getTag(trimmedTagName);
+          if (!tag) {
+            additionalWarnings.push(
+              `Row ${rowNumber}: Tag "${trimmedTagName}" not found. Session will be imported without tag.`,
+            );
+          }
         }
       }
 
@@ -404,6 +521,8 @@ export async function importSessionsFromCSV(
     failedRows,
     duplicatesSkipped: duplicateRows.length,
     duplicateRows,
+    tagsCreated: createdTags.length,
+    tagsCreatedList: createdTags,
   };
 }
 

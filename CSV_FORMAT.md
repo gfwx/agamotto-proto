@@ -67,15 +67,19 @@ Date,Time,Title,Duration (seconds),Rating,Comment,Tag,State
    - Valid data types (duration as number, rating 0-5)
    - Valid states (no active/paused sessions)
    - Required fields not empty
-3. **Duplicate Detection**: CRITICAL - Duplicates are automatically removed
+3. **Tag Creation**: AUTOMATIC - Missing tags are created automatically
+   - All unique tags in the CSV are extracted
+   - Tags that don't exist in the database are **automatically created**
+   - Available colors are assigned to new tags (from 24-color palette)
+   - If all colors are used (24 tags max), import will fail with clear error
+   - Created tags are reported in the import summary
+4. **Duplicate Detection**: CRITICAL - Duplicates are automatically removed
    - Duplicate check is based on **timestamp** (date + time)
    - If a session with the same timestamp already exists in the database, the import row is **skipped**
    - **EXISTING DATA IS ALWAYS PRIORITIZED** over imported data
    - Duplicates are tracked and reported in the import summary
-4. **Tag Matching**: Tags are matched with existing tags in database
-   - If tag not found: Session imports without tag (warning shown)
 5. **Import Execution**: Valid, non-duplicate sessions are imported to database
-6. **Results**: Toast notification shows success/failure/duplicate summary
+6. **Results**: Toast notification shows success/failure/duplicate/tag creation summary
 
 ## Export Process
 
@@ -83,6 +87,64 @@ Date,Time,Title,Duration (seconds),Rating,Comment,Tag,State
 2. All **completed** sessions are exported
 3. File is downloaded as `agamotto_export_[timestamp].csv`
 4. Format matches import requirements (DD/MM/YYYY, 24-hour time)
+
+## Tag Creation
+
+**AUTOMATIC**: The import system automatically creates missing tags during import.
+
+### How Tag Creation Works
+
+1. **Extraction**: All unique tag names are extracted from the CSV before import
+2. **Existence Check**: Each tag is checked against the database
+3. **Auto-Creation**: Missing tags are automatically created with:
+   - Next available color from the 24-color palette
+   - Current timestamp as `dateCreated` and `dateLastUsed`
+   - Initial `totalInstances` of 0
+4. **Reporting**: Created tags are listed in the import summary
+
+### Color Assignment
+
+- **Automatic**: Colors are assigned from the predefined 24-color palette
+- **Sequential**: First available color is used for each new tag
+- **No Conflicts**: System ensures no duplicate colors
+- **Maximum**: 24 tags total (one per color)
+
+### Example Scenario
+
+**Database contains:**
+```
+Tags: routine (#767676), sleep (#023E8A), work (#276221)
+```
+
+**CSV to import contains:**
+```csv
+Tag
+routine    ← Already exists, no action needed
+fitness    ← NEW, will be created with next available color
+education  ← NEW, will be created with next available color
+work       ← Already exists, no action needed
+```
+
+**Result:**
+- ✅ 2 new tags created: "fitness", "education"
+- 🎨 Colors assigned automatically from available palette
+- 📊 Import summary: "Created 2 new tag(s): fitness, education"
+
+### Maximum Tags Limit
+
+The system supports a **maximum of 24 tags** (limited by the color palette).
+
+**If limit is reached:**
+```
+❌ Import failed
+
+Cannot create tag "newtag": Maximum number of tags (24) reached.
+No available colors.
+```
+
+**Solution:**
+- Delete unused tags to free up colors
+- Or manually assign sessions to existing tags in the CSV
 
 ## Duplicate Handling
 
@@ -200,6 +262,7 @@ The repository includes test CSV files:
 3. **test-import-active-session.csv** - Demonstrates active/paused rejection
 4. **test-import-date-formats.csv** - Various date formats and edge cases
 5. **test-import-duplicates.csv** - Demonstrates duplicate detection and skipping
+6. **test-import-new-tags.csv** - Demonstrates automatic tag creation with new tag names
 
 ## Troubleshooting
 
@@ -210,11 +273,12 @@ The repository includes test CSV files:
 - Verify rating is between 0-5
 - Check that state is valid (and not "active" or "paused")
 
-### "Tag not found" warning
+### Tags automatically created
 
-- The tag name in the CSV doesn't exist in your database
-- Session will still import, but without the tag
-- Create the tag first, then re-import if needed
+- If a tag in the CSV doesn't exist, it will be **automatically created**
+- No manual tag creation needed before import
+- New tags are assigned available colors from the palette
+- Created tags are listed in the import summary
 
 ### "Cannot import active sessions"
 
