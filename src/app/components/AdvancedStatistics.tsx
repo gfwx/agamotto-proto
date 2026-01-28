@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { toPng } from "html-to-image";
 import {
   BarChart,
   Bar,
@@ -17,6 +18,7 @@ import {
   ArrowDown,
   ArrowUp,
   Info,
+  Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
@@ -27,6 +29,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Slider } from "./ui/slider";
+import { Checkbox } from "./ui/checkbox";
+import { Button } from "./ui/button";
 import type { Session } from "../../lib/db/appSessionUtil";
 import {
   getTagDailyDurations,
@@ -40,6 +44,7 @@ import {
   formatDuration,
   formatZScore,
   getDayKey,
+  removeOutliers,
 } from "../../lib/statisticsUtil";
 
 interface AdvancedStatisticsProps {
@@ -51,6 +56,9 @@ export default function AdvancedStatistics({
 }: AdvancedStatisticsProps) {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [tolerancePercentile, setTolerancePercentile] = useState<number>(0);
+  const [removeOutliersEnabled, setRemoveOutliersEnabled] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const exportRef = useRef<HTMLDivElement>(null);
 
   // Get list of tags that have at least one completed session
   const availableTags = useMemo(() => {
@@ -71,12 +79,22 @@ export default function AdvancedStatistics({
   }, [sessions]);
 
   // Get daily data for selected tag with completeness filtering
-  const filteredDayData = useMemo(() => {
+  const rawFilteredDayData = useMemo(() => {
     if (!selectedTag) return [];
 
     const dayData = getTagDailyDurations(sessions, selectedTag);
     return filterDaysByCompleteness(dayData, allDayTotals, tolerancePercentile);
   }, [sessions, selectedTag, tolerancePercentile, allDayTotals]);
+
+  // Apply outlier removal if enabled
+  const { filteredDayData, outliersRemoved } = useMemo(() => {
+    if (!removeOutliersEnabled) {
+      return { filteredDayData: rawFilteredDayData, outliersRemoved: 0 };
+    }
+
+    const result = removeOutliers(rawFilteredDayData);
+    return { filteredDayData: result.filtered, outliersRemoved: result.removed };
+  }, [rawFilteredDayData, removeOutliersEnabled]);
 
   // Calculate statistics
   const statistics = useMemo(() => {
@@ -152,6 +170,30 @@ export default function AdvancedStatistics({
     return session?.tag || null;
   }, [selectedTag, sessions]);
 
+  // Export statistics as image
+  const handleExportImage = async () => {
+    if (!exportRef.current || !selectedTag) return;
+
+    setIsExporting(true);
+    try {
+      const dataUrl = await toPng(exportRef.current, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+        pixelRatio: 2, // Higher quality
+      });
+
+      // Download the image
+      const link = document.createElement("a");
+      link.download = `agamotto-stats-${selectedTag}-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error("Failed to export image:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-6">
       {/* Header */}
@@ -222,6 +264,51 @@ export default function AdvancedStatistics({
                 </div>
               </div>
             )}
+
+            {/* Outlier Removal */}
+            {selectedTag && (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remove-outliers"
+                    checked={removeOutliersEnabled}
+                    onCheckedChange={(checked) =>
+                      setRemoveOutliersEnabled(checked === true)
+                    }
+                  />
+                  <label
+                    htmlFor="remove-outliers"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Remove extreme outliers (IQR method)
+                  </label>
+                </div>
+                {outliersRemoved > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {outliersRemoved} outlier(s) removed from analysis
+                  </div>
+                )}
+                <div className="text-xs text-muted-foreground">
+                  Uses Interquartile Range (IQR) to identify and exclude extreme values
+                </div>
+              </div>
+            )}
+
+            {/* Export Button */}
+            {selectedTag && statistics.count > 0 && (
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportImage}
+                  disabled={isExporting}
+                  className="w-full gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  {isExporting ? "Exporting..." : "Export Statistics as Image"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -240,7 +327,21 @@ export default function AdvancedStatistics({
 
       {/* Statistics Grid */}
       {selectedTag && statistics.count > 0 && (
-        <>
+        <div ref={exportRef} className="space-y-6">
+          {/* Export Header */}
+          <div className="px-6">
+            <div className="text-center space-y-1">
+              <h3 className="text-xl font-semibold">{selectedTag} Statistics</h3>
+              <p className="text-sm text-muted-foreground">
+                {new Date().toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+          </div>
+
           <div className="px-6">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {/* Mean */}
@@ -462,7 +563,7 @@ export default function AdvancedStatistics({
               </Card>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* No data state */}

@@ -321,6 +321,43 @@ export function createDistributionData(
 }
 
 /**
+ * Remove outliers using IQR (Interquartile Range) method
+ * Outliers are values outside [Q1 - 1.5*IQR, Q3 + 1.5*IQR]
+ */
+export function removeOutliers(
+  dayData: DayData[],
+): { filtered: DayData[]; removed: number } {
+  if (dayData.length < 4) {
+    // Need at least 4 data points for meaningful IQR calculation
+    return { filtered: dayData, removed: 0 };
+  }
+
+  const durations = dayData.map((d) => d.duration).sort((a, b) => a - b);
+
+  // Calculate Q1 (25th percentile) and Q3 (75th percentile)
+  const q1Index = Math.floor(durations.length * 0.25);
+  const q3Index = Math.floor(durations.length * 0.75);
+
+  const q1 = durations[q1Index];
+  const q3 = durations[q3Index];
+  const iqr = q3 - q1;
+
+  // Define outlier boundaries
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+
+  // Filter out outliers
+  const filtered = dayData.filter(
+    (day) => day.duration >= lowerBound && day.duration <= upperBound,
+  );
+
+  return {
+    filtered,
+    removed: dayData.length - filtered.length,
+  };
+}
+
+/**
  * Calculates percentile rank (0-100) for a specific value
  * Returns the percentage of values that are less than or equal to the given value
  */
