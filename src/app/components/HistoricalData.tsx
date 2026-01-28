@@ -473,17 +473,36 @@ export function HistoricalData({ sessions, onExport, onImport }: HistoricalDataP
       // Import sessions
       const result = await importSessionsFromCSV(content);
 
-      if (result.failedRows.length > 0) {
-        // Partial success
-        toast.warning("Import completed with errors", {
+      // Determine the appropriate toast based on results
+      const hasFailures = result.failedCount > 0;
+      const hasDuplicates = result.duplicatesSkipped > 0;
+      const hasSuccess = result.successCount > 0;
+
+      if (hasFailures || hasDuplicates) {
+        // Partial success or issues
+        const toastType = hasSuccess ? "warning" : "error";
+        const title = hasSuccess
+          ? "Import completed with issues"
+          : "Import failed";
+
+        toast[toastType](title, {
           description: (
             <div className="space-y-1">
-              <div className="text-sm">
-                {result.successCount} sessions imported successfully
-              </div>
-              <div className="text-sm">
-                {result.failedCount} sessions failed to import
-              </div>
+              {hasSuccess && (
+                <div className="text-sm font-medium">
+                  {result.successCount} sessions imported successfully
+                </div>
+              )}
+              {hasFailures && (
+                <div className="text-sm text-red-400">
+                  {result.failedCount} sessions failed to import
+                </div>
+              )}
+              {hasDuplicates && (
+                <div className="text-sm text-yellow-400">
+                  {result.duplicatesSkipped} duplicates skipped
+                </div>
+              )}
               {result.failedRows.slice(0, 2).map((failure, index) => (
                 <div key={index} className="text-xs text-muted-foreground">
                   Row {failure.rowNumber}: {failure.error}
@@ -492,6 +511,16 @@ export function HistoricalData({ sessions, onExport, onImport }: HistoricalDataP
               {result.failedRows.length > 2 && (
                 <div className="text-xs text-muted-foreground">
                   ...and {result.failedRows.length - 2} more failures
+                </div>
+              )}
+              {hasDuplicates && result.duplicateRows.slice(0, 2).map((dup, index) => (
+                <div key={index} className="text-xs text-muted-foreground">
+                  Row {dup.rowNumber}: Duplicate timestamp - "{dup.title}"
+                </div>
+              ))}
+              {result.duplicatesSkipped > 2 && (
+                <div className="text-xs text-muted-foreground">
+                  ...and {result.duplicatesSkipped - 2} more duplicates
                 </div>
               )}
             </div>

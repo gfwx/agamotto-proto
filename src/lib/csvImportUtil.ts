@@ -1,5 +1,5 @@
 import type { Session } from "./db/appSessionUtil";
-import { saveSession } from "./db/appSessionUtil";
+import { saveSession, getAllSessions } from "./db/appSessionUtil";
 import { getTag } from "./db/appTagUtil";
 
 /**
@@ -19,6 +19,8 @@ export interface ImportResult extends ImportValidationResult {
   successCount: number;
   failedCount: number;
   failedRows: Array<{ rowNumber: number; error: string }>;
+  duplicatesSkipped: number;
+  duplicateRows: Array<{ rowNumber: number; timestamp: number; title: string }>;
 }
 
 /**
@@ -285,10 +287,14 @@ export function validateCSV(content: string): ImportValidationResult {
 /**
  * Import sessions from CSV content
  *
- * CRITICAL CONSTRAINT: This function will REJECT any import containing sessions
- * with state "active" or "paused". The system enforces that only ONE active or
- * paused session can exist at any time. All imported sessions must have state
- * "completed", "aborted", or "not_started".
+ * CRITICAL CONSTRAINTS:
+ * 1. Will REJECT any import containing sessions with state "active" or "paused".
+ *    The system enforces that only ONE active or paused session can exist at any time.
+ *    All imported sessions must have state "completed", "aborted", or "not_started".
+ *
+ * 2. Will REJECT duplicate sessions based on timestamp. If a session with the same
+ *    timestamp already exists in the database, the import row is skipped.
+ *    EXISTING DATA IS ALWAYS PRIORITIZED over imported data.
  */
 export async function importSessionsFromCSV(
   content: string,
@@ -302,14 +308,24 @@ export async function importSessionsFromCSV(
       successCount: 0,
       failedCount: 0,
       failedRows: [],
+      duplicatesSkipped: 0,
+      duplicateRows: [],
     };
   }
+
+  // Get all existing sessions to check for duplicates
+  // Duplicates are determined by timestamp - if timestamp matches, it's a duplicate
+  const existingSessions = await getAllSessions();
+  const existingTimestamps = new Set(
+    existingSessions.map((session) => session.timestamp),
+  );
 
   const rows = parseCSV(content);
   const dataRows = rows.slice(1); // Skip header
 
   let successCount = 0;
   const failedRows: Array<{ rowNumber: number; error: string }> = [];
+  const duplicateRows: Array<{ rowNumber: number; timestamp: number; title: string }> = [];
   const additionalWarnings: string[] = [...validation.warnings];
 
   // Import each session
@@ -332,6 +348,16 @@ export async function importSessionsFromCSV(
 
       // Parse timestamp (DD/MM/YYYY format)
       const timestamp = parseDateDDMMYYYY(date, time);
+
+      // CRITICAL: Check for duplicate timestamp - existing data is always prioritized
+      if (existingTimestamps.has(timestamp)) {
+        duplicateRows.push({
+          rowNumber,
+          timestamp,
+          title: title.trim(),
+        });
+        continue; // Skip this row, don't import duplicate
+      }
 
       // Get tag if specified
       let tag = null;
@@ -376,6 +402,8 @@ export async function importSessionsFromCSV(
     successCount,
     failedCount: failedRows.length,
     failedRows,
+    duplicatesSkipped: duplicateRows.length,
+    duplicateRows,
   };
 }
 

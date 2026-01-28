@@ -1,0 +1,6 @@
+Date,Time,Title,Duration (seconds),Rating,Comment,Tag,State
+27/01/2026,09:00:00,Morning workout,3600,4,First occurrence,routine,completed
+27/01/2026,09:00:00,Morning workout DUPLICATE,3600,5,This should be skipped - same timestamp,routine,completed
+27/01/2026,14:30:00,Afternoon session,5400,4,Unique session,work,completed
+27/01/2026,14:30:00,Afternoon DUPLICATE,5400,3,This should also be skipped,work,completed
+27/01/2026,18:00:00,Evening session,7200,5,Unique session,sleep,completed
